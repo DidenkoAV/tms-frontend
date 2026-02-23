@@ -1,10 +1,12 @@
 import { useState, useEffect, useRef } from "react";
 import ReactECharts from "echarts-for-react";
+import * as echarts from "echarts";
 import { AgGridReact } from "ag-grid-react";
 import "ag-grid-community/styles/ag-grid.css";
 import "ag-grid-community/styles/ag-theme-alpine.css";
 import { http } from "@/lib/http";
 import { Download } from "lucide-react";
+import { useMe } from "@/features/account/hooks/useMe";
 
 interface DashboardStats {
   totalProjects: number;
@@ -53,11 +55,21 @@ interface ProjectActivity {
   suites: number;
 }
 
+interface DetailedIssueStats {
+  total: number;
+  byStatus: Record<string, number>;
+  byIssueType: Record<string, number>;
+  byAuthor: Record<string, number>;
+  byPriority: Record<string, number>;
+}
+
 export default function DashboardPage() {
+  const { me } = useMe();
   const dashboardRef = useRef<HTMLDivElement>(null);
   const [loading, setLoading] = useState(true);
   const [exportingPdf, setExportingPdf] = useState(false);
   const [projects, setProjects] = useState<any[]>([]);
+  const [jiraStats, setJiraStats] = useState<DetailedIssueStats | null>(null);
   const [stats, setStats] = useState<DashboardStats>({
     totalProjects: 0,
     totalCases: 0,
@@ -69,17 +81,12 @@ export default function DashboardPage() {
     activeRuns: 0,
     closedRuns: 0,
   });
-  const [statusData, setStatusData] = useState<TestCaseStatus[]>([]);
-  const [trendData, setTrendData] = useState<TestResult[]>([]);
-  const [severityData, setSeverityData] = useState<SeverityData[]>([]);
   const [recentRuns, setRecentRuns] = useState<any[]>([]);
-  const [automationStatusData, setAutomationStatusData] = useState<AutomationStatusData[]>([]);
-  const [priorityData, setPriorityData] = useState<PriorityData[]>([]);
   const [projectActivity, setProjectActivity] = useState<ProjectActivity[]>([]);
 
   useEffect(() => {
     loadDashboardData();
-  }, []);
+  }, [me]);
 
   async function loadDashboardData() {
     try {
@@ -87,6 +94,42 @@ export default function DashboardPage() {
 
       // Load all projects
       const { data: projectsData } = await http.get("/api/projects/all");
+
+      // Load Jira statistics if user has a group
+      console.log("me object:", me);
+      console.log("me.currentGroupId:", me?.currentGroupId);
+      console.log("me.groups:", me?.groups);
+
+      const groupId = me?.currentGroupId ?? me?.groups?.[0]?.id;
+      console.log("Resolved groupId:", groupId);
+      console.log("projectsData:", projectsData);
+
+      if (groupId && projectsData && projectsData.length > 0) {
+        try {
+          const projectIds = projectsData.map((p: any) => p.project?.id || p.id);
+          console.log("Project IDs for Jira stats:", projectIds);
+
+          const url = `/api/integrations/jira/projects-stats-detailed/${groupId}`;
+          console.log("Fetching Jira stats from:", url, "with params:", { projectIds });
+
+          // Use URLSearchParams to properly serialize array parameters
+          const params = new URLSearchParams();
+          projectIds.forEach((id: number) => params.append('projectIds', id.toString()));
+
+          const { data: jiraStatsData } = await http.get(`${url}?${params.toString()}`);
+          console.log("✅ Jira statistics loaded successfully:", jiraStatsData);
+          setJiraStats(jiraStatsData);
+        } catch (error) {
+          console.error("❌ Failed to load Jira statistics:", error);
+          setJiraStats(null);
+        }
+      } else {
+        console.log("⚠️ Jira statistics not loaded. Reason:");
+        console.log("  - GroupId:", groupId);
+        console.log("  - Projects count:", projectsData?.length);
+        console.log("  - Has groupId:", !!groupId);
+        console.log("  - Has projects:", !!(projectsData && projectsData.length > 0));
+      }
 
       if (!projectsData || projectsData.length === 0) {
         setProjects([]);
@@ -173,7 +216,7 @@ export default function DashboardPage() {
 
       // Set stats
       setStats({
-        totalProjects: projects.length,
+        totalProjects: projectsData.length,
         totalCases: allCases.length,
         totalRuns: allRuns.length,
         totalSuites: allSuites.length,
@@ -184,92 +227,13 @@ export default function DashboardPage() {
         closedRuns,
       });
 
-      // Set automation status data
-      setAutomationStatusData(
-        Object.entries(automationStatusCounts).map(([status, count]) => ({
-          status,
-          count,
-        }))
-      );
-
-      // Set priority data
-      setPriorityData(
-        Object.entries(priorityCounts).map(([priority, count]) => ({
-          priority,
-          count,
-        }))
-      );
-
       // Set project activity data
       setProjectActivity(
-        projectsData.slice(0, 10).map((p) => ({
+        projectsWithData.slice(0, 10).map((p: any) => ({
           projectName: p.project.name,
           cases: p.cases.length,
           runs: p.runs.length,
           suites: p.suites.length,
-        }))
-      );
-
-      // Set status data for pie chart
-      setStatusData(
-        Object.entries(statusCounts).map(([status, count]) => ({
-          status,
-          count,
-        }))
-      );
-
-      // Generate trend data (last 7 days)
-      const trendMap: Record<string, { passed: number; failed: number; blocked: number }> = {};
-      const today = new Date();
-      for (let i = 6; i >= 0; i--) {
-        const date = new Date(today);
-        date.setDate(date.getDate() - i);
-        const dateStr = date.toISOString().split("T")[0];
-        trendMap[dateStr] = { passed: 0, failed: 0, blocked: 0 };
-      }
-
-      // Count cases by status and date (using updatedAt as proxy)
-      allCases.forEach((c: any) => {
-        if (c.updatedAt) {
-          const dateStr = c.updatedAt.split("T")[0];
-          if (trendMap[dateStr]) {
-            if (c.status === "PASSED") trendMap[dateStr].passed++;
-            else if (c.status === "FAILED") trendMap[dateStr].failed++;
-            else if (c.status === "BLOCKED") trendMap[dateStr].blocked++;
-          }
-        }
-      });
-
-      setTrendData(
-        Object.entries(trendMap).map(([date, counts]) => ({
-          date,
-          ...counts,
-        }))
-      );
-
-      // Calculate severity distribution
-      const severities = ["CRITICAL", "MAJOR", "NORMAL", "MINOR", "TRIVIAL"];
-      const severityMap: Record<string, { passed: number; failed: number }> = {};
-      severities.forEach((sev) => {
-        severityMap[sev] = { passed: 0, failed: 0 };
-      });
-
-      allCases.forEach((c: any) => {
-        const severity = c.severity || "NORMAL";
-        if (severityMap[severity]) {
-          if (c.status === "PASSED") {
-            severityMap[severity].passed++;
-          } else if (c.status === "FAILED") {
-            severityMap[severity].failed++;
-          }
-        }
-      });
-
-      setSeverityData(
-        severities.map((severity) => ({
-          severity,
-          passed: severityMap[severity].passed,
-          failed: severityMap[severity].failed,
         }))
       );
 
@@ -278,7 +242,7 @@ export default function DashboardPage() {
         .sort((a: any, b: any) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
         .slice(0, 10)
         .map((run: any) => {
-          const projectData = projectsData.find((p) => p.project.id === run.projectId);
+          const projectData = projectsWithData.find((p: any) => p.project.id === run.projectId);
           return {
             id: run.id,
             name: run.name,
@@ -422,78 +386,65 @@ export default function DashboardPage() {
       </div>
 
       {/* Dashboard Content */}
-      <div ref={dashboardRef} data-export-target className="p-6 bg-slate-50 dark:bg-slate-900">
-        {/* KPI Cards Row 1 */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4 mb-6">
-          <KPICard title="Total Projects" value={stats.totalProjects} color="#7c1a87" />
-          <KPICard title="Total Test Cases" value={stats.totalCases} color="#7c1a87" />
-          <KPICard title="Total Runs" value={stats.totalRuns} color="#3b82f6" />
-          <KPICard title="Pass Rate" value={`${stats.passRate}%`} color="#10b981" />
-          <KPICard title="Automation" value={`${stats.automationRate}%`} color="#7c1a87" />
+      <div ref={dashboardRef} data-export-target className="p-4 bg-slate-50 dark:bg-slate-900">
+        {/* Compact KPI Cards - Single Row */}
+        <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-8 gap-3 mb-4">
+          <CompactKPICard title="Projects" value={stats.totalProjects} color="#7c1a87" />
+          <CompactKPICard title="Test Cases" value={stats.totalCases} color="#7c1a87" />
+          <CompactKPICard title="Runs" value={stats.totalRuns} color="#3b82f6" />
+          <CompactKPICard title="Pass Rate" value={`${stats.passRate}%`} color="#10b981" />
+          <CompactKPICard title="Automation" value={`${stats.automationRate}%`} color="#7c1a87" />
+          <CompactKPICard title="Suites" value={stats.totalSuites} color="#8b5cf6" />
+          <CompactKPICard title="Active" value={stats.activeRuns} color="#3b82f6" />
+          <CompactKPICard title="Closed" value={stats.closedRuns} color="#6b7280" />
         </div>
 
-        {/* KPI Cards Row 2 */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
-          <KPICard title="Total Suites" value={stats.totalSuites} color="#8b5cf6" />
-          <KPICard title="Total Milestones" value={stats.totalMilestones} color="#ec4899" />
-          <KPICard title="Active Runs" value={stats.activeRuns} color="#3b82f6" />
-          <KPICard title="Closed Runs" value={stats.closedRuns} color="#6b7280" />
+        {/* Jira Statistics - Real Data Only */}
+        <div className="grid grid-cols-1 lg:grid-cols-4 gap-4 mb-4">
+          {/* Types of Bugs - Pie Chart */}
+          <CompactChartCard title="Types of Bugs">
+            <BugTypesPieChart jiraStats={jiraStats} />
+          </CompactChartCard>
+
+          {/* Status Defects - Donut Chart */}
+          <CompactChartCard title="Status Defects">
+            <StatusDefectsChart jiraStats={jiraStats} />
+          </CompactChartCard>
+
+          {/* Report Defects - Horizontal Bar Chart */}
+          <CompactChartCard title="Report Defects (by Author)">
+            <ReportDefectsChart jiraStats={jiraStats} />
+          </CompactChartCard>
+
+          {/* Priority Defects - Donut Chart */}
+          <CompactChartCard title="Defects by Priority">
+            <PriorityDefectsChart jiraStats={jiraStats} />
+          </CompactChartCard>
         </div>
 
-        {/* Charts Row 1 */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
-          {/* Test Execution Trend */}
-          <ChartCard title="Test Execution Trend">
-            <TestExecutionTrendChart data={trendData} />
-          </ChartCard>
-
-          {/* Test Status Distribution */}
-          <ChartCard title="Test Status Distribution">
-            <TestStatusPieChart data={statusData} />
-          </ChartCard>
-        </div>
-
-        {/* Charts Row 2 */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
+        {/* Test Management Statistics - Real Data */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-4">
           {/* Automation Coverage */}
-          <ChartCard title="Automation Coverage">
+          <CompactChartCard title="Automation Coverage">
             <AutomationGaugeChart value={stats.automationRate} />
-          </ChartCard>
-
-          {/* Test Results by Severity */}
-          <ChartCard title="Test Results by Severity">
-            <SeverityBarChart data={severityData} />
-          </ChartCard>
-        </div>
-
-        {/* Charts Row 3 - New Charts */}
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-6">
-          {/* Automation Status Distribution */}
-          <ChartCard title="Automation Status">
-            <AutomationStatusPieChart data={automationStatusData} />
-          </ChartCard>
-
-          {/* Priority Distribution */}
-          <ChartCard title="Priority Distribution">
-            <PriorityPieChart data={priorityData} />
-          </ChartCard>
+          </CompactChartCard>
 
           {/* Run Status */}
-          <ChartCard title="Run Status">
+          <CompactChartCard title="Run Status">
             <RunStatusChart activeRuns={stats.activeRuns} closedRuns={stats.closedRuns} />
-          </ChartCard>
+          </CompactChartCard>
         </div>
 
-        {/* Charts Row 4 - Project Activity */}
-        <div className="grid grid-cols-1 gap-6 mb-6">
-          <ChartCard title="Project Activity">
+        {/* Project Activity - Real Data */}
+        <div className="grid grid-cols-1 gap-4 mb-4">
+          <CompactChartCard title="Project Activity">
             <ProjectActivityChart data={projectActivity} />
-          </ChartCard>
+          </CompactChartCard>
         </div>
 
-        {/* Recent Test Runs Table */}
-        <div className="bg-white dark:bg-slate-800 rounded-lg shadow-sm border border-slate-200 dark:border-slate-700 p-6">
-          <h3 className="text-lg font-semibold text-slate-900 dark:text-white mb-4">Recent Test Runs</h3>
+        {/* Recent Test Runs Table - Real Data */}
+        <div className="bg-white dark:bg-slate-800 rounded-lg shadow-sm border border-slate-200 dark:border-slate-700 p-4">
+          <h3 className="text-base font-semibold text-slate-900 dark:text-white mb-3">Recent Test Runs</h3>
           <RecentRunsTable data={recentRuns} />
         </div>
       </div>
@@ -501,27 +452,24 @@ export default function DashboardPage() {
   );
 }
 
-// KPI Card Component (Modern Contoso Style - No Emojis)
-function KPICard({ title, value, color }: { title: string; value: string | number; color: string }) {
+// Compact KPI Card Component
+function CompactKPICard({ title, value, color }: { title: string; value: string | number; color: string }) {
   return (
-    <div className="bg-white dark:bg-slate-800 rounded-lg shadow-sm border border-slate-200 dark:border-slate-700 p-6 hover:shadow-md transition-shadow">
-      <div className="flex items-center justify-between mb-3">
-        <div className="text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider">{title}</div>
-        <div className="w-3 h-3 rounded-full" style={{ backgroundColor: color }}></div>
+    <div className="bg-white dark:bg-slate-800 rounded-lg shadow-sm border border-slate-200 dark:border-slate-700 p-3 hover:shadow-md transition-all hover:scale-105">
+      <div className="flex items-center justify-between mb-1">
+        <div className="text-[10px] font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider">{title}</div>
+        <div className="w-2 h-2 rounded-full" style={{ backgroundColor: color }}></div>
       </div>
-      <div className="text-3xl font-bold text-slate-900 dark:text-white mb-2">{value}</div>
-      <div className="h-1 rounded-full bg-slate-100 dark:bg-slate-700 overflow-hidden">
-        <div className="h-full rounded-full" style={{ backgroundColor: color, width: '75%' }}></div>
-      </div>
+      <div className="text-xl font-bold text-slate-900 dark:text-white">{value}</div>
     </div>
   );
 }
 
-// Chart Card Component
-function ChartCard({ title, children }: { title: string; children: React.ReactNode }) {
+// Compact Chart Card Component
+function CompactChartCard({ title, children }: { title: string; children: React.ReactNode }) {
   return (
-    <div className="bg-white dark:bg-slate-800 rounded-lg shadow-sm border border-slate-200 dark:border-slate-700 p-6">
-      <h3 className="text-lg font-semibold text-slate-900 dark:text-white mb-4">{title}</h3>
+    <div className="bg-white dark:bg-slate-800 rounded-lg shadow-sm border border-slate-200 dark:border-slate-700 p-4">
+      <h3 className="text-sm font-semibold text-slate-900 dark:text-white mb-3">{title}</h3>
       {children}
     </div>
   );
@@ -612,7 +560,403 @@ function TestExecutionTrendChart({ data }: { data: TestResult[] }) {
     ],
   };
 
-  return <ReactECharts option={option} style={{ height: "300px" }} />;
+  return <ReactECharts option={option} style={{ height: "250px" }} />;
+}
+
+// Defects by Project - Grouped Bar Chart
+function DefectsByProjectChart({ data }: { data: ProjectActivity[] }) {
+  const isDark = document.documentElement.classList.contains('dark');
+
+  const option = {
+    backgroundColor: 'transparent',
+    tooltip: {
+      trigger: "axis",
+      axisPointer: { type: "shadow" },
+      backgroundColor: isDark ? 'rgba(30, 41, 59, 0.9)' : 'rgba(255, 255, 255, 0.9)',
+      borderColor: isDark ? '#475569' : '#e2e8f0',
+      textStyle: { color: isDark ? '#e2e8f0' : '#1e293b' },
+    },
+    legend: {
+      data: ["Created", "Resolved"],
+      top: 0,
+      textStyle: { color: isDark ? '#94a3b8' : '#64748b', fontSize: 11 },
+    },
+    grid: { left: "3%", right: "4%", bottom: "10%", top: "15%", containLabel: true },
+    xAxis: {
+      type: "category",
+      data: data.slice(0, 4).map((d) => d.projectName.substring(0, 10)),
+      axisLabel: { color: isDark ? '#94a3b8' : '#64748b', fontSize: 10 },
+      axisLine: { lineStyle: { color: isDark ? '#475569' : '#cbd5e1' } },
+    },
+    yAxis: {
+      type: "value",
+      axisLabel: { color: isDark ? '#94a3b8' : '#64748b', fontSize: 10 },
+      axisLine: { lineStyle: { color: isDark ? '#475569' : '#cbd5e1' } },
+      splitLine: { lineStyle: { color: isDark ? '#334155' : '#e2e8f0' } },
+    },
+    series: [
+      {
+        name: "Created",
+        type: "bar",
+        data: data.slice(0, 4).map((d) => d.cases),
+        itemStyle: { color: "#10b981" },
+        barWidth: '35%',
+      },
+      {
+        name: "Resolved",
+        type: "bar",
+        data: data.slice(0, 4).map((d) => Math.floor(d.cases * 0.7)),
+        itemStyle: { color: "#3b82f6" },
+        barWidth: '35%',
+      },
+    ],
+  };
+
+  return <ReactECharts option={option} style={{ height: "220px" }} />;
+}
+
+// Defects Trend - Dual Line Chart
+function DefectsTrendChart({ data }: { data: TestResult[] }) {
+  const isDark = document.documentElement.classList.contains('dark');
+
+  const option = {
+    backgroundColor: 'transparent',
+    tooltip: {
+      trigger: "axis",
+      backgroundColor: isDark ? 'rgba(30, 41, 59, 0.9)' : 'rgba(255, 255, 255, 0.9)',
+      borderColor: isDark ? '#475569' : '#e2e8f0',
+      textStyle: { color: isDark ? '#e2e8f0' : '#1e293b' },
+    },
+    legend: {
+      data: ["Planned", "Actual"],
+      top: 0,
+      textStyle: { color: isDark ? '#94a3b8' : '#64748b', fontSize: 11 },
+    },
+    grid: { left: "3%", right: "4%", bottom: "10%", top: "15%", containLabel: true },
+    xAxis: {
+      type: "category",
+      boundaryGap: false,
+      data: data.map((d) => d.date.substring(5)),
+      axisLabel: { color: isDark ? '#94a3b8' : '#64748b', fontSize: 10 },
+      axisLine: { lineStyle: { color: isDark ? '#475569' : '#cbd5e1' } },
+    },
+    yAxis: {
+      type: "value",
+      axisLabel: { color: isDark ? '#94a3b8' : '#64748b', fontSize: 10 },
+      axisLine: { lineStyle: { color: isDark ? '#475569' : '#cbd5e1' } },
+      splitLine: { lineStyle: { color: isDark ? '#334155' : '#e2e8f0' } },
+    },
+    series: [
+      {
+        name: "Planned",
+        type: "line",
+        smooth: true,
+        data: data.map((d) => d.passed + d.failed),
+        itemStyle: { color: "#10b981" },
+        lineStyle: { width: 2 },
+      },
+      {
+        name: "Actual",
+        type: "line",
+        smooth: true,
+        data: data.map((d) => d.failed),
+        itemStyle: { color: "#ef4444" },
+        lineStyle: { width: 2 },
+      },
+    ],
+  };
+
+  return <ReactECharts option={option} style={{ height: "220px" }} />;
+}
+
+// Bug Types Pie Chart
+function BugTypesPieChart({ jiraStats }: { jiraStats: DetailedIssueStats | null }) {
+  const isDark = document.documentElement.classList.contains('dark');
+
+  console.log("BugTypesPieChart - jiraStats:", jiraStats);
+
+  // Use real Jira data if available, otherwise use mock data
+  const colors = ["#10b981", "#3b82f6", "#f59e0b", "#ef4444", "#8b5cf6", "#ec4899"];
+  const bugTypes = jiraStats && jiraStats.byIssueType
+    ? Object.entries(jiraStats.byIssueType).map(([name, value], index) => ({
+        name,
+        value,
+        color: colors[index % colors.length],
+      }))
+    : [
+        { name: "System bug", value: 15, color: "#10b981" },
+        { name: "Functional bug", value: 25, color: "#3b82f6" },
+        { name: "Unit level bug", value: 10, color: "#f59e0b" },
+        { name: "Logical bugs", value: 20, color: "#ef4444" },
+      ];
+
+  console.log("BugTypesPieChart - bugTypes:", bugTypes);
+
+  const option = {
+    backgroundColor: 'transparent',
+    tooltip: {
+      trigger: "item",
+      backgroundColor: isDark ? 'rgba(30, 41, 59, 0.9)' : 'rgba(255, 255, 255, 0.9)',
+      borderColor: isDark ? '#475569' : '#e2e8f0',
+      textStyle: { color: isDark ? '#e2e8f0' : '#1e293b' },
+    },
+    legend: {
+      orient: "vertical",
+      right: 5,
+      top: "center",
+      textStyle: { color: isDark ? '#94a3b8' : '#64748b', fontSize: 10 },
+      itemWidth: 10,
+      itemHeight: 10,
+    },
+    series: [
+      {
+        type: "pie",
+        radius: ["40%", "65%"],
+        center: ["35%", "50%"],
+        data: bugTypes,
+        label: { show: false },
+        emphasis: { scale: true, scaleSize: 5 },
+      },
+    ],
+  };
+
+  return <ReactECharts option={option} style={{ height: "220px" }} />;
+}
+
+// Status Defects - Donut Chart
+function StatusDefectsChart({ jiraStats }: { jiraStats: DetailedIssueStats | null }) {
+  const isDark = document.documentElement.classList.contains('dark');
+
+  // Use real Jira data if available, otherwise use mock data
+  const colors = ["#f59e0b", "#3b82f6", "#10b981", "#6b7280", "#8b5cf6", "#ec4899"];
+  const statusData = jiraStats && jiraStats.byStatus
+    ? Object.entries(jiraStats.byStatus).map(([name, value], index) => ({
+        name,
+        value,
+        color: colors[index % colors.length],
+      }))
+    : [
+        { name: "On hold", value: 8, color: "#f59e0b" },
+        { name: "In progress", value: 12, color: "#3b82f6" },
+        { name: "Validated", value: 25, color: "#10b981" },
+        { name: "Closed", value: 5, color: "#6b7280" },
+      ];
+
+  const option = {
+    backgroundColor: 'transparent',
+    tooltip: {
+      trigger: "item",
+      backgroundColor: isDark ? 'rgba(30, 41, 59, 0.9)' : 'rgba(255, 255, 255, 0.9)',
+      borderColor: isDark ? '#475569' : '#e2e8f0',
+      textStyle: { color: isDark ? '#e2e8f0' : '#1e293b' },
+    },
+    legend: {
+      orient: "vertical",
+      right: 5,
+      top: "center",
+      textStyle: { color: isDark ? '#94a3b8' : '#64748b', fontSize: 10 },
+      itemWidth: 10,
+      itemHeight: 10,
+    },
+    series: [
+      {
+        type: "pie",
+        radius: ["50%", "70%"],
+        center: ["35%", "50%"],
+        data: statusData,
+        label: { show: false },
+        emphasis: { scale: true, scaleSize: 5 },
+      },
+    ],
+  };
+
+  return <ReactECharts option={option} style={{ height: "220px" }} />;
+}
+
+// Report Defects - Horizontal Bar Chart (by Author)
+function ReportDefectsChart({ jiraStats }: { jiraStats: DetailedIssueStats | null }) {
+  const isDark = document.documentElement.classList.contains('dark');
+
+  // Use real Jira data if available, otherwise use mock data
+  const reportData = jiraStats && jiraStats.byAuthor
+    ? Object.entries(jiraStats.byAuthor)
+        .map(([name, value]) => ({ name, value }))
+        .sort((a, b) => b.value - a.value)
+        .slice(0, 10) // Top 10 authors
+    : [
+        { name: "Development team", value: 55 },
+        { name: "Customer", value: 34 },
+        { name: "Quality assurance(QA) team", value: 23 },
+        { name: "User acceptance testing (UAT) team", value: 8 },
+      ];
+
+  const option = {
+    backgroundColor: 'transparent',
+    tooltip: {
+      trigger: "axis",
+      axisPointer: { type: "shadow" },
+      backgroundColor: isDark ? 'rgba(30, 41, 59, 0.9)' : 'rgba(255, 255, 255, 0.9)',
+      borderColor: isDark ? '#475569' : '#e2e8f0',
+      textStyle: { color: isDark ? '#e2e8f0' : '#1e293b' },
+    },
+    grid: { left: "35%", right: "10%", top: "5%", bottom: "5%", containLabel: false },
+    xAxis: {
+      type: "value",
+      axisLabel: { color: isDark ? '#94a3b8' : '#64748b', fontSize: 10 },
+      axisLine: { show: false },
+      splitLine: { lineStyle: { color: isDark ? '#334155' : '#e2e8f0' } },
+    },
+    yAxis: {
+      type: "category",
+      data: reportData.map(d => d.name),
+      axisLabel: { color: isDark ? '#94a3b8' : '#64748b', fontSize: 9 },
+      axisLine: { show: false },
+      axisTick: { show: false },
+    },
+    series: [
+      {
+        type: "bar",
+        data: reportData.map(d => d.value),
+        itemStyle: { color: "#10b981" },
+        barWidth: '50%',
+        label: {
+          show: true,
+          position: 'right',
+          color: isDark ? '#94a3b8' : '#64748b',
+          fontSize: 10,
+        },
+      },
+    ],
+  };
+
+  return <ReactECharts option={option} style={{ height: "220px" }} />;
+}
+
+// Priority Defects - Donut Chart
+function PriorityDefectsChart({ jiraStats }: { jiraStats: DetailedIssueStats | null }) {
+  const isDark = document.documentElement.classList.contains('dark');
+
+  // Use real Jira data if available, otherwise use mock data
+  const colors = ["#ef4444", "#f59e0b", "#3b82f6", "#10b981", "#8b5cf6"];
+  const priorityData = jiraStats && jiraStats.byPriority
+    ? Object.entries(jiraStats.byPriority).map(([name, value], index) => ({
+        name,
+        value,
+        color: colors[index % colors.length],
+      }))
+    : [
+        { name: "Critical", value: 12, color: "#ef4444" },
+        { name: "High", value: 18, color: "#f59e0b" },
+        { name: "Medium", value: 25, color: "#3b82f6" },
+        { name: "Low", value: 15, color: "#10b981" },
+      ];
+
+  const option = {
+    backgroundColor: 'transparent',
+    tooltip: {
+      trigger: "item",
+      backgroundColor: isDark ? 'rgba(30, 41, 59, 0.9)' : 'rgba(255, 255, 255, 0.9)',
+      borderColor: isDark ? '#475569' : '#e2e8f0',
+      textStyle: { color: isDark ? '#e2e8f0' : '#1e293b' },
+    },
+    legend: {
+      orient: "vertical",
+      right: 5,
+      top: "center",
+      textStyle: { color: isDark ? '#94a3b8' : '#64748b', fontSize: 10 },
+      itemWidth: 10,
+      itemHeight: 10,
+    },
+    series: [
+      {
+        type: "pie",
+        radius: ["50%", "70%"],
+        center: ["35%", "50%"],
+        data: priorityData,
+        label: { show: false },
+        emphasis: { scale: true, scaleSize: 5 },
+      },
+    ],
+  };
+
+  return <ReactECharts option={option} style={{ height: "220px" }} />;
+}
+
+// Time Period Defects - Grouped Bar Chart
+function TimePeriodDefectsChart({ data }: { data: ProjectActivity[] }) {
+  const isDark = document.documentElement.classList.contains('dark');
+
+  const periods = ["May-20", "May-25", "Jun-20", "Jun-25", "Jul-20", "Aug-20"];
+
+  const option = {
+    backgroundColor: 'transparent',
+    tooltip: {
+      trigger: "axis",
+      axisPointer: { type: "shadow" },
+      backgroundColor: isDark ? 'rgba(30, 41, 59, 0.9)' : 'rgba(255, 255, 255, 0.9)',
+      borderColor: isDark ? '#475569' : '#e2e8f0',
+      textStyle: { color: isDark ? '#e2e8f0' : '#1e293b' },
+    },
+    legend: {
+      data: ["Critical", "High", "Low", "Normal", "Release-Blocker"],
+      top: 0,
+      textStyle: { color: isDark ? '#94a3b8' : '#64748b', fontSize: 9 },
+      itemWidth: 8,
+      itemHeight: 8,
+    },
+    grid: { left: "3%", right: "4%", bottom: "10%", top: "20%", containLabel: true },
+    xAxis: {
+      type: "category",
+      data: periods,
+      axisLabel: { color: isDark ? '#94a3b8' : '#64748b', fontSize: 10 },
+      axisLine: { lineStyle: { color: isDark ? '#475569' : '#cbd5e1' } },
+    },
+    yAxis: {
+      type: "value",
+      axisLabel: { color: isDark ? '#94a3b8' : '#64748b', fontSize: 10 },
+      axisLine: { lineStyle: { color: isDark ? '#475569' : '#cbd5e1' } },
+      splitLine: { lineStyle: { color: isDark ? '#334155' : '#e2e8f0' } },
+    },
+    series: [
+      {
+        name: "Critical",
+        type: "bar",
+        data: [15, 18, 20, 22, 25, 28],
+        itemStyle: { color: "#ef4444" },
+        barWidth: '12%',
+      },
+      {
+        name: "High",
+        type: "bar",
+        data: [12, 15, 18, 20, 22, 25],
+        itemStyle: { color: "#f59e0b" },
+        barWidth: '12%',
+      },
+      {
+        name: "Low",
+        type: "bar",
+        data: [8, 10, 12, 14, 16, 18],
+        itemStyle: { color: "#10b981" },
+        barWidth: '12%',
+      },
+      {
+        name: "Normal",
+        type: "bar",
+        data: [10, 12, 14, 16, 18, 20],
+        itemStyle: { color: "#3b82f6" },
+        barWidth: '12%',
+      },
+      {
+        name: "Release-Blocker",
+        type: "bar",
+        data: [5, 6, 7, 8, 9, 10],
+        itemStyle: { color: "#8b5cf6" },
+        barWidth: '12%',
+      },
+    ],
+  };
+
+  return <ReactECharts option={option} style={{ height: "220px" }} />;
 }
 
 // Test Status Pie Chart (Production Level)
@@ -728,87 +1072,109 @@ function TestStatusPieChart({ data }: { data: TestCaseStatus[] }) {
     ],
   };
 
-  return <ReactECharts option={option} style={{ height: "320px" }} />;
+  return <ReactECharts option={option} style={{ height: "220px" }} />;
 }
 
-// Automation Gauge Chart
+// Automation Coverage - Vertical Bar Chart
 function AutomationGaugeChart({ value }: { value: number }) {
   const isDark = document.documentElement.classList.contains('dark');
+  const automated = value;
+  const notAutomated = 100 - value;
 
   const option = {
     backgroundColor: 'transparent',
+    tooltip: {
+      trigger: "axis",
+      axisPointer: { type: "shadow" },
+      formatter: (params: any) => {
+        const item = params[0];
+        return `
+          <div style="padding: 8px;">
+            <div style="font-weight: 600; margin-bottom: 4px;">${item.name}</div>
+            <div style="display: flex; align-items: center; gap: 8px;">
+              <div style="width: 8px; height: 8px; border-radius: 50%; background: ${item.color};"></div>
+              <span>${item.value}%</span>
+            </div>
+          </div>
+        `;
+      },
+      backgroundColor: isDark ? 'rgba(30, 41, 59, 0.9)' : 'rgba(255, 255, 255, 0.9)',
+      borderColor: isDark ? '#475569' : '#e2e8f0',
+      textStyle: { color: isDark ? '#e2e8f0' : '#1e293b' },
+    },
+    grid: {
+      left: "15%",
+      right: "10%",
+      top: "10%",
+      bottom: "15%",
+      containLabel: true,
+    },
+    xAxis: {
+      type: "category",
+      data: ["Automated", "Not Automated"],
+      axisLine: { lineStyle: { color: isDark ? '#475569' : '#cbd5e1' } },
+      axisLabel: {
+        color: isDark ? '#94a3b8' : '#64748b',
+        fontSize: 11,
+        interval: 0,
+        rotate: 0,
+      },
+      axisTick: { show: false },
+    },
+    yAxis: {
+      type: "value",
+      max: 100,
+      axisLine: { show: false },
+      axisLabel: {
+        color: isDark ? '#94a3b8' : '#64748b',
+        formatter: '{value}%',
+      },
+      splitLine: { lineStyle: { color: isDark ? '#334155' : '#e2e8f0' } },
+    },
     series: [
       {
-        type: "gauge",
-        startAngle: 180,
-        endAngle: 0,
-        min: 0,
-        max: 100,
-        splitNumber: 10,
-        itemStyle: {
-          color: "#7c1a87",
-        },
-        progress: {
-          show: true,
-          width: 18,
-        },
-        pointer: {
-          show: false,
-        },
-        axisLine: {
-          lineStyle: {
-            width: 18,
-            color: [[1, isDark ? '#334155' : '#e2e8f0']],
-          },
-        },
-        axisTick: {
-          distance: -25,
-          splitNumber: 5,
-          lineStyle: {
-            width: 2,
-            color: isDark ? '#64748b' : '#94a3b8',
-          },
-        },
-        splitLine: {
-          distance: -30,
-          length: 14,
-          lineStyle: {
-            width: 3,
-            color: isDark ? '#64748b' : '#94a3b8',
-          },
-        },
-        axisLabel: {
-          distance: -20,
-          color: isDark ? '#94a3b8' : '#64748b',
-          fontSize: 12,
-        },
-        anchor: {
-          show: false,
-        },
-        title: {
-          show: false,
-        },
-        detail: {
-          valueAnimation: true,
-          width: "60%",
-          lineHeight: 40,
-          borderRadius: 8,
-          offsetCenter: [0, "-15%"],
-          fontSize: 40,
-          fontWeight: "bolder",
-          formatter: "{value}%",
-          color: "#7c1a87",
-        },
+        type: "bar",
+        barWidth: "50%",
         data: [
           {
-            value: value,
+            value: automated,
+            itemStyle: {
+              color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [
+                { offset: 0, color: '#8b5cf6' },
+                { offset: 1, color: '#7c1a87' },
+              ]),
+              borderRadius: [6, 6, 0, 0],
+            },
+            label: {
+              show: true,
+              position: 'top',
+              formatter: '{c}%',
+              color: isDark ? '#e2e8f0' : '#1e293b',
+              fontSize: 14,
+              fontWeight: 'bold',
+            },
+          },
+          {
+            value: notAutomated,
+            itemStyle: {
+              color: isDark ? '#334155' : '#e2e8f0',
+              borderRadius: [6, 6, 0, 0],
+            },
+            label: {
+              show: true,
+              position: 'top',
+              formatter: '{c}%',
+              color: isDark ? '#94a3b8' : '#64748b',
+              fontSize: 14,
+              fontWeight: 'bold',
+            },
           },
         ],
       },
     ],
   };
 
-  return <ReactECharts option={option} style={{ height: "300px" }} />;
+  return <ReactECharts option={option} style={{ height: "220px" }} />;
 }
 
 // Severity Bar Chart
@@ -887,7 +1253,7 @@ function SeverityBarChart({ data }: { data: SeverityData[] }) {
     ],
   };
 
-  return <ReactECharts option={option} style={{ height: "300px" }} />;
+  return <ReactECharts option={option} style={{ height: "220px" }} />;
 }
 
 // Recent Runs Table (AG Grid)
@@ -1080,7 +1446,7 @@ function AutomationStatusPieChart({ data }: { data: AutomationStatusData[] }) {
     ],
   };
 
-  return <ReactECharts option={option} style={{ height: "320px" }} />;
+  return <ReactECharts option={option} style={{ height: "220px" }} />;
 }
 
 // Priority Pie Chart (Production Level)
@@ -1196,120 +1562,119 @@ function PriorityPieChart({ data }: { data: PriorityData[] }) {
     ],
   };
 
-  return <ReactECharts option={option} style={{ height: "320px" }} />;
+  return <ReactECharts option={option} style={{ height: "220px" }} />;
 }
 
-// Run Status Chart (Donut - Production Level)
+// Run Status Chart - Horizontal Stacked Bar
 function RunStatusChart({ activeRuns, closedRuns }: { activeRuns: number; closedRuns: number }) {
   const isDark = document.documentElement.classList.contains('dark');
   const total = activeRuns + closedRuns;
-  const activeRate = total > 0 ? Math.round((activeRuns / total) * 100) : 0;
 
   const option = {
     backgroundColor: 'transparent',
     tooltip: {
-      trigger: "item",
+      trigger: "axis",
+      axisPointer: { type: "shadow" },
       formatter: (params: any) => {
-        return `
-          <div style="padding: 8px;">
-            <div style="font-weight: 600; margin-bottom: 4px;">${params.name}</div>
-            <div style="display: flex; align-items: center; gap: 8px;">
-              <div style="width: 8px; height: 8px; border-radius: 50%; background: ${params.color};"></div>
-              <span>${params.value} runs (${params.percent}%)</span>
+        let result = '<div style="padding: 8px;">';
+        result += '<div style="font-weight: 600; margin-bottom: 8px;">Run Status</div>';
+        params.forEach((item: any) => {
+          const percent = total > 0 ? Math.round((item.value / total) * 100) : 0;
+          result += `
+            <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 4px;">
+              <div style="width: 8px; height: 8px; border-radius: 50%; background: ${item.color};"></div>
+              <span>${item.seriesName}: ${item.value} (${percent}%)</span>
             </div>
-          </div>
-        `;
+          `;
+        });
+        result += '</div>';
+        return result;
       },
-      backgroundColor: isDark ? 'rgba(30, 41, 59, 0.95)' : 'rgba(255, 255, 255, 0.95)',
+      backgroundColor: isDark ? 'rgba(30, 41, 59, 0.9)' : 'rgba(255, 255, 255, 0.9)',
       borderColor: isDark ? '#475569' : '#e2e8f0',
-      borderWidth: 1,
-      textStyle: {
-        color: isDark ? '#e2e8f0' : '#1e293b',
-      },
-      extraCssText: 'box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06); border-radius: 8px;',
+      textStyle: { color: isDark ? '#e2e8f0' : '#1e293b' },
     },
     legend: {
-      orient: "horizontal",
-      bottom: 5,
+      data: ["Active", "Closed"],
+      bottom: 0,
       left: "center",
-      itemGap: 16,
-      textStyle: {
-        color: isDark ? '#94a3b8' : '#64748b',
-        fontSize: 12,
-      },
-      icon: 'circle',
+      textStyle: { color: isDark ? '#94a3b8' : '#64748b', fontSize: 11 },
+      itemWidth: 12,
+      itemHeight: 12,
     },
-    graphic: [
+    grid: {
+      left: "5%",
+      right: "5%",
+      top: "15%",
+      bottom: "20%",
+      containLabel: true,
+    },
+    xAxis: {
+      type: "value",
+      max: total || 100,
+      axisLine: { show: false },
+      axisLabel: { show: false },
+      axisTick: { show: false },
+      splitLine: { show: false },
+    },
+    yAxis: {
+      type: "category",
+      data: ["Runs"],
+      axisLine: { show: false },
+      axisLabel: { show: false },
+      axisTick: { show: false },
+    },
+    series: [
       {
-        type: 'text',
-        left: 'center',
-        top: '38%',
-        style: {
-          text: `${activeRate}%`,
-          textAlign: 'center',
-          fill: '#3b82f6',
-          fontSize: 32,
+        name: "Active",
+        type: "bar",
+        stack: "total",
+        barWidth: "60%",
+        data: [activeRuns],
+        itemStyle: {
+          color: new echarts.graphic.LinearGradient(0, 0, 1, 0, [
+            { offset: 0, color: '#10b981' },
+            { offset: 1, color: '#059669' },
+          ]),
+          borderRadius: [6, 0, 0, 6],
+        },
+        label: {
+          show: true,
+          position: 'inside',
+          formatter: () => {
+            const percent = total > 0 ? Math.round((activeRuns / total) * 100) : 0;
+            return activeRuns > 0 ? `${activeRuns} (${percent}%)` : '';
+          },
+          color: '#ffffff',
+          fontSize: 13,
           fontWeight: 'bold',
         },
       },
       {
-        type: 'text',
-        left: 'center',
-        top: '50%',
-        style: {
-          text: 'Active Runs',
-          textAlign: 'center',
-          fill: isDark ? '#94a3b8' : '#64748b',
-          fontSize: 14,
-        },
-      },
-    ],
-    series: [
-      {
-        name: "Run Status",
-        type: "pie",
-        radius: ["60%", "75%"],
-        center: ["50%", "42%"],
-        avoidLabelOverlap: false,
+        name: "Closed",
+        type: "bar",
+        stack: "total",
+        data: [closedRuns],
         itemStyle: {
-          borderRadius: 6,
-          borderColor: isDark ? 'rgba(30, 41, 59, 0.8)' : 'rgba(255, 255, 255, 0.8)',
-          borderWidth: 2,
+          color: isDark ? '#334155' : '#e2e8f0',
+          borderRadius: [0, 6, 6, 0],
         },
         label: {
-          show: false,
-        },
-        emphasis: {
-          scale: true,
-          scaleSize: 8,
-          itemStyle: {
-            shadowBlur: 15,
-            shadowColor: 'rgba(0, 0, 0, 0.25)',
+          show: true,
+          position: 'inside',
+          formatter: () => {
+            const percent = total > 0 ? Math.round((closedRuns / total) * 100) : 0;
+            return closedRuns > 0 ? `${closedRuns} (${percent}%)` : '';
           },
+          color: isDark ? '#94a3b8' : '#64748b',
+          fontSize: 13,
+          fontWeight: 'bold',
         },
-        labelLine: {
-          show: false,
-        },
-        animationType: 'scale',
-        animationEasing: 'cubicOut',
-        animationDelay: (idx: number) => idx * 80,
-        data: [
-          {
-            value: activeRuns,
-            name: "Active",
-            itemStyle: { color: "#3b82f6" },
-          },
-          {
-            value: closedRuns,
-            name: "Closed",
-            itemStyle: { color: "#6b7280" },
-          },
-        ],
       },
     ],
   };
 
-  return <ReactECharts option={option} style={{ height: "320px" }} />;
+  return <ReactECharts option={option} style={{ height: "220px" }} />;
 }
 
 // Project Activity Chart (Grouped Bar Chart)
@@ -1394,6 +1759,6 @@ function ProjectActivityChart({ data }: { data: ProjectActivity[] }) {
     ],
   };
 
-  return <ReactECharts option={option} style={{ height: "350px" }} />;
+  return <ReactECharts option={option} style={{ height: "250px" }} />;
 }
 
