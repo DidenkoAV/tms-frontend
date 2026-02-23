@@ -37,6 +37,86 @@ function clsx(...xs: Array<string | false | null | undefined>) {
   return xs.filter(Boolean).join(" ");
 }
 
+/** Smart description formatter for Jira issues */
+function FormattedDescription({ description }: { description: string }) {
+  if (!description || description === "—") {
+    return (
+      <div className="flex items-center gap-2 p-4 rounded-lg bg-slate-100/50 dark:bg-slate-800/30 border border-dashed border-slate-300 dark:border-slate-700">
+        <ClockIcon className="w-4 h-4 text-slate-400 dark:text-slate-500" />
+        <p className="text-sm text-slate-500 dark:text-slate-400 italic font-medium">
+          No description provided
+        </p>
+      </div>
+    );
+  }
+
+  // Parse structured parameters (Company:, Instance:, User:, etc.)
+  const lines = description.split('\n');
+  const params: Array<{ key: string; value: string }> = [];
+  const textLines: string[] = [];
+
+  lines.forEach(line => {
+    const match = line.match(/^([A-Z][a-zA-Z\s]*?):\s*(.+)$/);
+    if (match) {
+      params.push({ key: match[1].trim(), value: match[2].trim() });
+    } else if (line.trim()) {
+      textLines.push(line);
+    }
+  });
+
+  return (
+    <div className="space-y-4">
+      {/* Regular text content with enhanced styling */}
+      {textLines.length > 0 && (
+        <div className="p-4 rounded-lg bg-gradient-to-br from-slate-50 to-slate-100/50 dark:from-slate-800/40 dark:to-slate-900/40 border border-slate-200 dark:border-slate-700/50 shadow-sm">
+          <div className="prose prose-sm dark:prose-invert max-w-none
+            prose-p:text-slate-700 dark:prose-p:text-slate-300 prose-p:leading-relaxed
+            prose-strong:text-slate-900 dark:prose-strong:text-slate-100 prose-strong:font-bold
+            prose-em:text-slate-600 dark:prose-em:text-slate-400 prose-em:italic
+            prose-code:text-pink-600 dark:prose-code:text-pink-400 prose-code:bg-pink-50 dark:prose-code:bg-pink-950/30 prose-code:px-1.5 prose-code:py-0.5 prose-code:rounded prose-code:font-mono prose-code:text-xs
+            prose-a:text-blue-600 dark:prose-a:text-blue-400 prose-a:no-underline hover:prose-a:underline
+            prose-ul:list-disc prose-ul:pl-5 prose-ul:space-y-1
+            prose-ol:list-decimal prose-ol:pl-5 prose-ol:space-y-1
+            prose-li:text-slate-700 dark:prose-li:text-slate-300
+            prose-blockquote:border-l-4 prose-blockquote:border-blue-500 prose-blockquote:pl-4 prose-blockquote:italic prose-blockquote:text-slate-600 dark:prose-blockquote:text-slate-400
+          ">
+            <ReactMarkdown remarkPlugins={[remarkGfm]}>
+              {textLines.join('\n')}
+            </ReactMarkdown>
+          </div>
+        </div>
+      )}
+
+      {/* Structured parameters with premium design */}
+      {params.length > 0 && (
+        <div className="p-4 space-y-3 rounded-xl bg-gradient-to-br from-blue-50 via-indigo-50 to-purple-50 border-2 border-blue-200/60 dark:from-blue-950/40 dark:via-indigo-950/40 dark:to-purple-950/40 dark:border-blue-800/50 shadow-md">
+          <div className="flex items-center gap-2 mb-1">
+            <div className="w-1.5 h-5 rounded-full bg-gradient-to-b from-blue-500 via-indigo-500 to-purple-500 shadow-sm"></div>
+            <span className="text-xs font-bold uppercase tracking-wider bg-gradient-to-r from-blue-700 to-indigo-700 dark:from-blue-300 dark:to-indigo-300 bg-clip-text text-transparent">
+              Parameters
+            </span>
+          </div>
+          <div className="grid gap-2.5">
+            {params.map((param, idx) => (
+              <div
+                key={idx}
+                className="flex items-start gap-3 p-3 rounded-lg bg-white/80 dark:bg-slate-900/60 border border-blue-200/50 dark:border-blue-900/50 shadow-sm hover:shadow-md transition-shadow"
+              >
+                <span className="inline-flex items-center justify-center min-w-[90px] px-3 py-1.5 text-xs font-extrabold rounded-md bg-gradient-to-r from-blue-600 via-indigo-600 to-purple-600 text-white shadow-md">
+                  {param.key}
+                </span>
+                <span className="flex-1 py-1.5 text-sm font-mono font-medium text-slate-900 dark:text-slate-100 break-all leading-relaxed">
+                  {param.value}
+                </span>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 /** Jira-like priority */
 function PriorityBadge({ priority }: { priority?: string }) {
   if (!priority) return <span className="text-xs text-slate-500 dark:text-slate-400">—</span>;
@@ -112,7 +192,7 @@ export default function JiraIssuesBlock({
 
   const [attachments, setAttachments] = useState<Attachment[]>([]);
   const [openAttachmentsFor, setOpenAttachmentsFor] = useState<number | null>(null);
-  const [hoveredIssue, setHoveredIssue] = useState<JiraIssue | null>(null);
+  const [expandedIssue, setExpandedIssue] = useState<number | null>(null);
 
   const fileInputRef = useRef<HTMLInputElement | null>(null);
 
@@ -372,6 +452,7 @@ export default function JiraIssuesBlock({
           <table className="w-full text-sm border-collapse">
             <thead>
               <tr className="text-xs uppercase text-slate-500 bg-slate-50 dark:text-slate-400 dark:bg-slate-900/40">
+                <th className="w-12 px-3 py-2 text-center"></th>
                 <th className="w-24 px-3 py-2 text-left">Key</th>
                 <th className="w-48 px-3 py-2 text-left">Summary</th>
                 <th className="px-3 py-2 text-left w-44">Status</th>
@@ -386,9 +467,20 @@ export default function JiraIssuesBlock({
                   <tr
                     key={iss.id}
                     className="transition hover:bg-slate-50 dark:hover:bg-slate-800/40"
-                    onMouseEnter={() => setHoveredIssue(iss)}
-                    onMouseLeave={() => setHoveredIssue(null)}
                   >
+                    <td className="px-3 py-2 text-center">
+                      <button
+                        onClick={() => setExpandedIssue(expandedIssue === iss.id ? null : iss.id)}
+                        className="text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200 transition"
+                        title={expandedIssue === iss.id ? "Hide description" : "Show description"}
+                      >
+                        {expandedIssue === iss.id ? (
+                          <ChevronUpIcon className="w-4 h-4" />
+                        ) : (
+                          <ChevronDownIcon className="w-4 h-4" />
+                        )}
+                      </button>
+                    </td>
                     <td className="px-3 py-2 font-semibold truncate">
                       <a
                         href={iss.issueUrl}
@@ -400,8 +492,10 @@ export default function JiraIssuesBlock({
                         <ExternalLinkIcon className="w-3 h-3" />
                       </a>
                     </td>
-                    <td className="px-3 py-2 truncate text-slate-700 dark:text-slate-300">
-                      {iss.summary || "—"}
+                    <td className="px-3 py-2">
+                      <div className="font-medium truncate text-slate-800 dark:text-slate-100">
+                        {iss.summary || "—"}
+                      </div>
                     </td>
                     <td className="px-3 py-2">
                       <StatusBadge status={iss.status} />
@@ -443,7 +537,7 @@ export default function JiraIssuesBlock({
                   </tr>
                   {openAttachmentsFor === iss.id && (
                     <tr>
-                      <td colSpan={6} className="bg-slate-50 dark:bg-slate-900/40">
+                      <td colSpan={7} className="bg-slate-50 dark:bg-slate-900/40">
                         <div className="p-3 border-t border-slate-200 dark:border-slate-700">
                           <div className="flex items-center justify-between mb-2">
                             <span className="text-xs font-semibold text-slate-600 dark:text-slate-300">
@@ -476,33 +570,58 @@ export default function JiraIssuesBlock({
                       </td>
                     </tr>
                   )}
+                  {expandedIssue === iss.id && (
+                    <tr>
+                      <td colSpan={7} className="p-0">
+                        <div className="p-6 text-sm bg-gradient-to-br from-white via-slate-50/50 to-blue-50/30 border-t-2 border-b-2 border-slate-200/80 dark:from-slate-900 dark:via-slate-900/90 dark:to-blue-950/20 dark:border-slate-700/80 animate-fadeIn">
+                          {/* Header */}
+                          <div className="flex items-start justify-between gap-3 pb-4 border-b-2 border-slate-200/70 dark:border-slate-700/70">
+                            <div className="flex-1">
+                              <div className="flex items-center gap-2 mb-2">
+                                <span className="px-3 py-1 text-xs font-extrabold rounded-md bg-gradient-to-r from-blue-600 to-indigo-600 text-white shadow-md">
+                                  {iss.issueKey}
+                                </span>
+                                <StatusBadge status={iss.status} />
+                                <PriorityBadge priority={iss.priority} />
+                              </div>
+                              <h3 className="text-xl font-extrabold leading-tight bg-gradient-to-r from-slate-900 via-slate-800 to-slate-700 dark:from-slate-50 dark:via-slate-200 dark:to-slate-300 bg-clip-text text-transparent drop-shadow-sm">
+                                {iss.summary || "—"}
+                              </h3>
+                            </div>
+                            <button
+                              onClick={() => setExpandedIssue(null)}
+                              className="text-slate-400 hover:text-slate-600 dark:text-slate-500 dark:hover:text-slate-300 transition"
+                              title="Close description"
+                            >
+                              <XIcon className="w-5 h-5" />
+                            </button>
+                          </div>
+
+                          {/* Description with smart formatting */}
+                          <div className="mt-4 overflow-y-auto max-h-96 scrollbar-thin scrollbar-thumb-slate-300 dark:scrollbar-thumb-slate-700 scrollbar-track-transparent">
+                            <FormattedDescription description={iss.description || ""} />
+                          </div>
+
+                          {/* Footer - Enhanced */}
+                          {iss.author && (
+                            <div className="flex items-center gap-3 pt-4 mt-4 border-t-2 border-slate-200/70 dark:border-slate-700/70">
+                              <div className="flex items-center justify-center w-8 h-8 text-sm font-bold rounded-full bg-gradient-to-br from-purple-500 via-pink-500 to-rose-500 text-white shadow-lg ring-2 ring-purple-200 dark:ring-purple-900/50">
+                                {iss.author.charAt(0).toUpperCase()}
+                              </div>
+                              <span className="text-sm text-slate-700 dark:text-slate-300">
+                                <span className="font-bold text-slate-900 dark:text-slate-100">Author:</span>{" "}
+                                <span className="font-medium">{iss.author}</span>
+                              </span>
+                            </div>
+                          )}
+                        </div>
+                      </td>
+                    </tr>
+                  )}
                 </>
               ))}
             </tbody>
           </table>
-
-          {/* Hover Preview */}
-          {hoveredIssue && (
-            <div className="p-4 mt-4 text-sm bg-white border rounded-lg shadow border-slate-200 dark:border-slate-700 dark:bg-slate-900 animate-fadeIn">
-              <p className="text-sm font-bold text-slate-800 dark:text-slate-100">
-                {hoveredIssue.issueKey} — {hoveredIssue.summary || "—"}
-              </p>
-              <div className="mt-2 overflow-y-auto prose-sm prose dark:prose-invert max-h-48">
-                <ReactMarkdown remarkPlugins={[remarkGfm]}>
-                  {hoveredIssue.description || "—"}
-                </ReactMarkdown>
-              </div>
-              <div className="flex flex-wrap gap-4 mt-2">
-                <StatusBadge status={hoveredIssue.status} />
-                <PriorityBadge priority={hoveredIssue.priority} />
-              </div>
-              {hoveredIssue.author && (
-                <p className="mt-2 text-xs text-slate-600 dark:text-slate-400">
-                  Author: {hoveredIssue.author}
-                </p>
-              )}
-            </div>
-          )}
         </div>
       )}
     </div>
