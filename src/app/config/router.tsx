@@ -20,6 +20,9 @@ import MilestonePage from "@/pages/MilestonePage";
 import RegisterPage from "@/pages/RegisterPage";
 import CheckEmailPage from "@/pages/CheckEmailPage";
 import VerifyEmailPage from "@/pages/VerifyEmailPage";
+import ForgotPasswordPage from "@/pages/ForgotPasswordPage";
+import ResetPasswordPage from "@/pages/ResetPasswordPage";
+import ConfirmEmailPage from "@/pages/ConfirmEmailPage";
 import GroupInviteAcceptPage from "@/pages/GroupInviteAcceptPage";
 
 const router = createBrowserRouter([
@@ -32,6 +35,9 @@ const router = createBrowserRouter([
       { path: "register", element: <RegisterPage /> },
       { path: "check-email", element: <CheckEmailPage /> },
       { path: "verify", element: <VerifyEmailPage /> },
+      { path: "forgot-password", element: <ForgotPasswordPage /> },
+      { path: "reset-password", element: <ResetPasswordPage /> },
+      { path: "confirm-email", element: <ConfirmEmailPage /> },
 
       // Public group invite acceptance page
       { path: "invite/accept", element: <GroupInviteAcceptPage /> },

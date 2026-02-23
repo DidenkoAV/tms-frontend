@@ -26,7 +26,7 @@ export default function CheckEmailPage() {
     if (!email) return;
     setLoading(true); setMsg(null);
     try {
-      await http.post("/api/auth/verify-email/resend", { email });
+      await http.post(`/api/auth/verification/resend?email=${encodeURIComponent(email)}`);
       setMsg("If the account exists, we sent a new email.");
       setCooldown(30);
       const timer = setInterval(() => {

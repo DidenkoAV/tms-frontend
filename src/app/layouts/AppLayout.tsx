@@ -155,7 +155,7 @@ export default function App() {
                   onLogout={onLogout}
                 />
               )}
-              <ThemeToggle />
+              {authed && <ThemeToggle />}
             </nav>
           </div>
         </header>

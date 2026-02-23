@@ -161,6 +161,14 @@ function onGoogle() {
                 required
                 autoComplete="current-password"
               />
+              <div className="mt-1.5 text-right">
+                <Link
+                  to="/forgot-password"
+                  className="text-xs text-slate-500 hover:text-[#7c1a87] hover:underline"
+                >
+                  Forgot password?
+                </Link>
+              </div>
             </div>
 
             <button

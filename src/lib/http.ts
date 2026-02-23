@@ -50,7 +50,17 @@ http.interceptors.response.use(
     if (error.response?.status === 401) {
       const currentPath = window.location.pathname;
       // Only redirect if we're not already on a public page
-      if (!["/", "/register", "/verify", "/reset", "/check-email"].includes(currentPath)) {
+      const publicPaths = [
+        "/",
+        "/register",
+        "/verify",
+        "/check-email",
+        "/forgot-password",
+        "/reset-password",
+        "/confirm-email",
+        "/invite/accept"
+      ];
+      if (!publicPaths.includes(currentPath)) {
         setAuthToken(null);
         window.location.replace("/");
       }
