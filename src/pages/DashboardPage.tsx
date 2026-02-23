@@ -4,6 +4,7 @@ import { AgGridReact } from "ag-grid-react";
 import "ag-grid-community/styles/ag-grid.css";
 import "ag-grid-community/styles/ag-theme-alpine.css";
 import { http } from "@/lib/http";
+import { Download } from "lucide-react";
 
 interface DashboardStats {
   totalProjects: number;
@@ -400,21 +401,21 @@ export default function DashboardPage() {
             <h1 className="text-2xl font-bold text-slate-900 dark:text-white">Dashboard</h1>
             <p className="text-sm text-slate-600 dark:text-slate-400">Analytics and insights</p>
           </div>
-          <div className="flex gap-3">
+          <div className="flex gap-2">
             <button
               onClick={exportToPNG}
-              className="px-4 py-2 text-sm font-medium text-white rounded-lg transition-all hover:opacity-90"
-              style={{ backgroundColor: "#7c1a87" }}
+              className="inline-flex h-9 items-center gap-1.5 rounded-xl border px-3 text-sm font-medium leading-none transition-all duration-150 focus:outline-none focus-visible:ring-2 bg-white/90 text-slate-900 border-slate-300 hover:-translate-y-0.5 hover:bg-white hover:border-slate-400 hover:shadow-sm dark:bg-[#0b1222]/80 dark:text-white dark:border-slate-700/60 dark:hover:bg-[#0e1a2c] dark:hover:border-slate-500"
             >
-              Export PNG
+              <Download className="w-4 h-4" />
+              <span>Export PNG</span>
             </button>
             <button
               onClick={exportToPDF}
               disabled={exportingPdf}
-              className="px-4 py-2 text-sm font-medium text-white rounded-lg transition-all hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed"
-              style={{ backgroundColor: "#7c1a87" }}
+              className="inline-flex h-9 items-center gap-1.5 rounded-xl border px-3 text-sm font-medium leading-none transition-all duration-150 focus:outline-none focus-visible:ring-2 bg-white/90 text-slate-900 border-slate-300 hover:-translate-y-0.5 hover:bg-white hover:border-slate-400 hover:shadow-sm dark:bg-[#0b1222]/80 dark:text-white dark:border-slate-700/60 dark:hover:bg-[#0e1a2c] dark:hover:border-slate-500 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:translate-y-0"
             >
-              {exportingPdf ? "Generating PDF..." : "Export PDF"}
+              <Download className="w-4 h-4" />
+              <span>{exportingPdf ? "Generating PDF..." : "Export PDF"}</span>
             </button>
           </div>
         </div>

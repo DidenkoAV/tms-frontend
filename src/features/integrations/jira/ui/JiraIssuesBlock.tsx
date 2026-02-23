@@ -30,8 +30,6 @@ import {
   Loader2Icon,
 } from "lucide-react";
 
-import { PrimaryButton } from "@/shared/ui/buttons";
-
 /* --------------------------- Helpers --------------------------- */
 function clsx(...xs: Array<string | false | null | undefined>) {
   return xs.filter(Boolean).join(" ");
@@ -230,26 +228,25 @@ export default function JiraIssuesBlock({
     });
   }
 
-  const actionBtnBase = "flex items-center gap-1 rounded-md px-2 py-1 text-xs transition";
+  const actionBtnBase = "flex items-center gap-1 rounded-lg px-3 py-1.5 text-xs font-medium transition-all";
+  const primaryBtn = "text-white hover:opacity-90 shadow-sm";
+  const secondaryBtn = "border border-slate-200 bg-white text-slate-700 hover:bg-slate-50 dark:border-slate-700 dark:bg-white dark:text-slate-900 dark:hover:bg-slate-100";
+
   return (
     <div className="rounded-2xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-[#0f1524] shadow-sm p-4">
       {/* Header */}
       <div className="flex items-center justify-between mb-3">
         <button
-          className={clsx(actionBtnBase, "text-slate-600 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-800")}
+          className={clsx(actionBtnBase, secondaryBtn)}
           onClick={loadIssues}
         >
           {loading ? <Loader2Icon className="w-3 h-3 animate-spin" /> : <RefreshCcwIcon className="w-3 h-3" />}
           Refresh
         </button>
-        <div className="flex gap-1">
+        <div className="flex gap-2">
           <button
-            className={clsx(
-              actionBtnBase,
-              showAttach
-                ? "bg-slate-200 text-slate-900 ring-1 ring-slate-300 dark:bg-slate-700 dark:text-slate-100 dark:ring-slate-600"
-                : "text-slate-600 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-800"
-            )}
+            className={clsx(actionBtnBase, showAttach ? primaryBtn : secondaryBtn)}
+            style={showAttach ? { backgroundColor: "#7c1a87" } : undefined}
             onClick={() => {
               setShowAttach((v) => !v);
               setShowCreate(false);
@@ -258,12 +255,8 @@ export default function JiraIssuesBlock({
             <Link2Icon className="w-3 h-3" /> Attach
           </button>
           <button
-            className={clsx(
-              actionBtnBase,
-              showCreate
-                ? "bg-slate-200 text-slate-900 ring-1 ring-slate-300 dark:bg-slate-700 dark:text-slate-100 dark:ring-slate-600"
-                : "text-slate-600 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-800"
-            )}
+            className={clsx(actionBtnBase, showCreate ? primaryBtn : secondaryBtn)}
+            style={showCreate ? { backgroundColor: "#7c1a87" } : undefined}
             onClick={() => {
               setShowCreate((v) => !v);
               setShowAttach(false);
@@ -296,7 +289,7 @@ export default function JiraIssuesBlock({
               placeholder="Jira issue key"
               className="flex-1 px-3 py-2 text-sm bg-white border rounded-md text-slate-800 border-slate-300 dark:bg-slate-900 dark:border-slate-600 dark:text-slate-100"
             />
-            <PrimaryButton
+            <button
               onClick={async () => {
                 try {
                   await attachJiraIssue(groupId, testCaseId, attachKey);
@@ -308,16 +301,17 @@ export default function JiraIssuesBlock({
                   notify?.("error", "Failed to attach issue");
                 }
               }}
-              className="text-xs px-3 py-1.5"
+              className={clsx(actionBtnBase, primaryBtn)}
+              style={{ backgroundColor: "#7c1a87" }}
             >
               Attach
-            </PrimaryButton>
-            <PrimaryButton
+            </button>
+            <button
               onClick={() => setShowAttach(false)}
-              className="text-xs px-3 py-1.5"
+              className={clsx(actionBtnBase, secondaryBtn)}
             >
               Cancel
-            </PrimaryButton>
+            </button>
           </div>
         </div>
       )}
@@ -382,12 +376,12 @@ export default function JiraIssuesBlock({
             }}
           />
 
-          <PrimaryButton
+          <button
             onClick={() => fileInputRef.current?.click()}
-            className="text-xs px-3 py-1.5"
+            className={clsx(actionBtnBase, secondaryBtn)}
           >
             Choose Files
-          </PrimaryButton>
+          </button>
           {attachments.length > 0 && (
             <ul className="p-2 mt-2 overflow-auto text-xs bg-white border rounded-md text-slate-800 border-slate-300 dark:bg-slate-900 dark:border-slate-700 dark:text-slate-300 max-h-32">
               {attachments.map((att, idx) => (
@@ -406,10 +400,13 @@ export default function JiraIssuesBlock({
           )}
 
           <div className="flex justify-end gap-2">
-            <PrimaryButton onClick={() => setShowCreate(false)} className="text-xs px-3 py-1.5">
+            <button
+              onClick={() => setShowCreate(false)}
+              className={clsx(actionBtnBase, secondaryBtn)}
+            >
               Cancel
-            </PrimaryButton>
-            <PrimaryButton
+            </button>
+            <button
               onClick={async () => {
                 try {
                   await createJiraIssue(groupId, testCaseId, {
@@ -430,10 +427,11 @@ export default function JiraIssuesBlock({
                   notify?.("error", "Failed to create issue");
                 }
               }}
-              className="text-xs px-3 py-1.5"
+              className={clsx(actionBtnBase, primaryBtn)}
+              style={{ backgroundColor: "#7c1a87" }}
             >
               Create
-            </PrimaryButton>
+            </button>
           </div>
         </div>
       )}
