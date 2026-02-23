@@ -1,0 +1,16 @@
+export * from "./IconBase";
+export * from "./Edit";
+export * from "./Trash";
+export * from "./Grid";
+export * from "./Table";
+export * from "./Open";
+export * from "./Star";
+export { default as BackIcon } from "./BackIcon";
+export { default as ChevronRightIcon } from "./ChevronRightIcon";
+export { default as ChevronDownIcon } from "./ChevronDownIcon";
+export { default as FolderIcon }       from "./FolderIcon";
+export { default as FileIcon }         from "./FileIcon";
+export { default as PlusIcon }         from "./PlusIcon";
+export { default as SortIcon }         from "./SortIcon";
+export { default as UploadIcon } from "./UploadIcon";
+export { default as DownloadIcon } from "./DownloadIcon";

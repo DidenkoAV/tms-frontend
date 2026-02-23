@@ -1,0 +1,51 @@
+/* All @import statements must be first */
+@import url('https://fonts.googleapis.com/css2?family=Sora:wght@400;600;700&display=swap');
+@import "tailwindcss";
+
+/* Bind `dark:` variant to .dark class on <html> (Tailwind v4) */
+@custom-variant dark (.dark &);
+
+html, body, #root { height: 100%; }
+
+/* Test Forge brand display font */
+:root {
+  --forge-display: "Sora", ui-sans-serif, system-ui, -apple-system, "Segoe UI",
+                   Roboto, "Helvetica Neue", Arial, "Apple Color Emoji","Segoe UI Emoji";
+}
+
+/* Base animations and utilities */
+@keyframes forgeFadeIn { from {opacity:0; transform: translateY(6px)} to {opacity:1; transform:none} }
+@keyframes forgePulse  { 0%,100% {opacity:.55} 50% {opacity:.9} }
+
+.forge-fade-in { animation: forgeFadeIn .5s ease-out both }
+.forge-pulse   { animation: forgePulse 2.8s ease-in-out infinite }
+
+/* Soft glow for donut charts */
+.forge-glow { filter: drop-shadow(0 8px 22px rgba(16,185,129,.25)) drop-shadow(0 2px 6px rgba(16,185,129,.25)); }
+.dark .forge-glow { filter: drop-shadow(0 10px 26px rgba(139,92,246,.25)) drop-shadow(0 3px 8px rgba(34,211,238,.25)); }
+
+/* Gear mechanism: strict rotation and compact sparks */
+@keyframes forgeRotateCW  { from{transform:rotate(0)} to{transform:rotate(360deg)} }
+@keyframes forgeRotateCCW { from{transform:rotate(0)} to{transform:rotate(-360deg)} }
+
+.forge-gear       { transform-box: fill-box; transform-origin: center; }
+.forge-cw         { animation: forgeRotateCW  linear infinite; }
+.forge-ccw        { animation: forgeRotateCCW linear infinite; }
+.forge-gear-glow  { filter: drop-shadow(0 2px 8px rgba(148,163,184,.25)); }
+.dark .forge-gear-glow { filter: drop-shadow(0 2px 10px rgba(0,0,0,.45)); }
+
+/* Compact engineering sparks directly in SVG */
+@keyframes sparkMove {
+  0%   { transform: translate(0,0); opacity: .95; filter: drop-shadow(0 0 3px rgba(255,196,86,.85)); }
+  100% { transform: translate(var(--dx), var(--dy)); opacity: 0; filter: none; }
+}
+.svg-spark {
+  transform-box: fill-box; transform-origin: center;
+  animation: sparkMove var(--dur,1.0s) linear var(--delay,0s) forwards;
+}
+.dark .svg-spark { filter: drop-shadow(0 0 3px rgba(255,196,150,.6)); }
+
+/* Respect user's motion preferences */
+@media (prefers-reduced-motion: reduce) {
+  .forge-cw, .forge-ccw, .svg-spark, .forge-pulse, .forge-fade-in { animation: none !important; }
+}
