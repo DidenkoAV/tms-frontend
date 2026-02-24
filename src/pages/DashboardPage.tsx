@@ -5,8 +5,10 @@ import { AgGridReact } from "ag-grid-react";
 import "ag-grid-community/styles/ag-grid.css";
 import "ag-grid-community/styles/ag-theme-alpine.css";
 import { http } from "@/lib/http";
-import { Download } from "lucide-react";
+import { Download, Filter, X } from "lucide-react";
 import { useMe } from "@/features/account/hooks/useMe";
+import * as htmlToImage from 'html-to-image';
+import jsPDF from "jspdf";
 
 interface DashboardStats {
   totalProjects: number;
@@ -68,7 +70,9 @@ export default function DashboardPage() {
   const dashboardRef = useRef<HTMLDivElement>(null);
   const [loading, setLoading] = useState(true);
   const [exportingPdf, setExportingPdf] = useState(false);
+  const [exportingPng, setExportingPng] = useState(false);
   const [projects, setProjects] = useState<any[]>([]);
+  const [selectedProjectIds, setSelectedProjectIds] = useState<number[]>([]);
   const [jiraStats, setJiraStats] = useState<DetailedIssueStats | null>(null);
   const [stats, setStats] = useState<DashboardStats>({
     totalProjects: 0,
@@ -86,7 +90,7 @@ export default function DashboardPage() {
 
   useEffect(() => {
     loadDashboardData();
-  }, [me]);
+  }, [me, selectedProjectIds]);
 
   async function loadDashboardData() {
     try {
@@ -94,42 +98,6 @@ export default function DashboardPage() {
 
       // Load all projects
       const { data: projectsData } = await http.get("/api/projects/all");
-
-      // Load Jira statistics if user has a group
-      console.log("me object:", me);
-      console.log("me.currentGroupId:", me?.currentGroupId);
-      console.log("me.groups:", me?.groups);
-
-      const groupId = me?.currentGroupId ?? me?.groups?.[0]?.id;
-      console.log("Resolved groupId:", groupId);
-      console.log("projectsData:", projectsData);
-
-      if (groupId && projectsData && projectsData.length > 0) {
-        try {
-          const projectIds = projectsData.map((p: any) => p.project?.id || p.id);
-          console.log("Project IDs for Jira stats:", projectIds);
-
-          const url = `/api/integrations/jira/projects-stats-detailed/${groupId}`;
-          console.log("Fetching Jira stats from:", url, "with params:", { projectIds });
-
-          // Use URLSearchParams to properly serialize array parameters
-          const params = new URLSearchParams();
-          projectIds.forEach((id: number) => params.append('projectIds', id.toString()));
-
-          const { data: jiraStatsData } = await http.get(`${url}?${params.toString()}`);
-          console.log("✅ Jira statistics loaded successfully:", jiraStatsData);
-          setJiraStats(jiraStatsData);
-        } catch (error) {
-          console.error("❌ Failed to load Jira statistics:", error);
-          setJiraStats(null);
-        }
-      } else {
-        console.log("⚠️ Jira statistics not loaded. Reason:");
-        console.log("  - GroupId:", groupId);
-        console.log("  - Projects count:", projectsData?.length);
-        console.log("  - Has groupId:", !!groupId);
-        console.log("  - Has projects:", !!(projectsData && projectsData.length > 0));
-      }
 
       if (!projectsData || projectsData.length === 0) {
         setProjects([]);
@@ -148,12 +116,35 @@ export default function DashboardPage() {
         return;
       }
 
-      // Save projects to state for PDF export
+      // Save projects to state
       setProjects(projectsData);
 
-      // Load data for all projects in parallel
+      // Filter projects based on selection
+      const filteredProjects = selectedProjectIds.length > 0
+        ? projectsData.filter((p: any) => selectedProjectIds.includes(p.id))
+        : projectsData;
+
+      // Load Jira statistics if user has a group
+      const groupId = me?.currentGroupId ?? me?.groups?.[0]?.id;
+
+      if (groupId && filteredProjects && filteredProjects.length > 0) {
+        try {
+          const projectIds = filteredProjects.map((p: any) => p.project?.id || p.id);
+          const url = `/api/integrations/jira/projects-stats-detailed/${groupId}`;
+          const params = new URLSearchParams();
+          projectIds.forEach((id: number) => params.append('projectIds', id.toString()));
+
+          const { data: jiraStatsData } = await http.get(`${url}?${params.toString()}`);
+          setJiraStats(jiraStatsData);
+        } catch (error) {
+          console.error("❌ Failed to load Jira statistics:", error);
+          setJiraStats(null);
+        }
+      }
+
+      // Load data for filtered projects in parallel
       const projectsWithData = await Promise.all(
-        projectsData.map(async (project: any) => {
+        filteredProjects.map(async (project: any) => {
           try {
             const [casesRes, runsRes, suitesRes, milestonesRes] = await Promise.all([
               http.get(`/api/projects/${project.id}/cases`),
@@ -216,7 +207,7 @@ export default function DashboardPage() {
 
       // Set stats
       setStats({
-        totalProjects: projectsData.length,
+        totalProjects: filteredProjects.length,
         totalCases: allCases.length,
         totalRuns: allRuns.length,
         totalSuites: allSuites.length,
@@ -263,33 +254,33 @@ export default function DashboardPage() {
   }
 
   async function exportToPNG() {
-    if (!dashboardRef.current) return;
+    if (!dashboardRef.current) {
+      alert("Dashboard not ready for export");
+      return;
+    }
 
     try {
-      console.log("Starting high-quality PNG export...");
+      setExportingPng(true);
+      console.log("Starting high-quality PNG export with html-to-image...");
 
-      // Dynamic import to avoid Vite issues
-      const domtoimage = await import("dom-to-image-more");
+      // Wait for all charts to render
+      await new Promise((resolve) => setTimeout(resolve, 500));
 
-      console.log("dom-to-image-more loaded, capturing dashboard at 2x resolution...");
+      const element = dashboardRef.current;
+      const isDark = document.documentElement.classList.contains('dark');
 
-      // Capture at 2x resolution for high quality
-      const scale = 2;
-      const dataUrl = await domtoimage.toPng(dashboardRef.current, {
-        quality: 1,
-        bgcolor: "#ffffff",
-        width: dashboardRef.current.offsetWidth * scale,
-        height: dashboardRef.current.offsetHeight * scale,
-        style: {
-          transform: `scale(${scale})`,
-          transformOrigin: "top left",
-          width: `${dashboardRef.current.offsetWidth}px`,
-          height: `${dashboardRef.current.offsetHeight}px`,
-        },
+      // Use html-to-image which handles modern CSS better
+      const dataUrl = await htmlToImage.toPng(element, {
+        quality: 1.0,
+        pixelRatio: 4, // 4x resolution for high quality
+        backgroundColor: isDark ? '#0f172a' : '#f8fafc',
+        cacheBust: true,
+        skipFonts: false,
       });
 
-      console.log("High-quality image created, downloading...");
+      console.log("High-quality PNG created, downloading...");
 
+      // Download the image
       const link = document.createElement("a");
       link.download = `Messagepoint-TMS-Dashboard-${new Date().toISOString().split("T")[0]}.png`;
       link.href = dataUrl;
@@ -299,47 +290,134 @@ export default function DashboardPage() {
     } catch (error) {
       console.error("Failed to export PNG:", error);
       alert(`Failed to export PNG: ${error instanceof Error ? error.message : "Unknown error"}`);
+    } finally {
+      setExportingPng(false);
     }
   }
 
   async function exportToPDF() {
-    if (projects.length === 0) {
-      alert("No projects available to export");
+    if (!dashboardRef.current) {
+      alert("Dashboard not ready for export");
       return;
     }
 
     try {
       setExportingPdf(true);
-      console.log("Starting backend PDF export...");
+      console.log("Starting high-quality PDF export with html-to-image...");
 
-      // Get all project IDs
-      const projectIds = projects.map((p: any) => p.id);
+      // Wait for all charts to render
+      await new Promise((resolve) => setTimeout(resolve, 500));
 
-      // Call backend API to generate PDF
-      const response = await http.post(
-        "/api/dashboard/export-pdf",
-        { projectIds },
-        {
-          responseType: "blob", // Important: tell axios to expect binary data
-        }
+      const element = dashboardRef.current;
+      const isDark = document.documentElement.classList.contains('dark');
+
+      // Use html-to-image to capture the dashboard
+      const dataUrl = await htmlToImage.toPng(element, {
+        quality: 0.98,
+        pixelRatio: 3, // 3x resolution for PDF
+        backgroundColor: isDark ? '#0f172a' : '#f8fafc',
+        cacheBust: true,
+        skipFonts: false,
+      });
+
+      console.log("Image created, generating PDF...");
+
+      // Create an image to get dimensions
+      const img = new Image();
+      img.src = dataUrl;
+      await new Promise((resolve) => {
+        img.onload = resolve;
+      });
+
+      // Calculate dimensions
+      const imgWidth = img.width;
+      const imgHeight = img.height;
+
+      // A4 dimensions in pixels at 72 DPI
+      const a4Width = 297; // mm
+      const a4Height = 210; // mm (landscape)
+
+      // Determine orientation based on aspect ratio
+      const isPortrait = imgHeight > imgWidth;
+      const pageWidth = isPortrait ? a4Height : a4Width;
+      const pageHeight = isPortrait ? a4Width : a4Height;
+
+      // Create PDF
+      const pdf = new jsPDF({
+        orientation: isPortrait ? 'portrait' : 'landscape',
+        unit: 'mm',
+        format: 'a4',
+        compress: true,
+      });
+
+      // Calculate scaling to fit the page
+      const margin = 10;
+      const maxWidth = pageWidth - (2 * margin);
+      const maxHeight = pageHeight - 40; // Leave space for header and footer
+
+      const widthRatio = maxWidth / (imgWidth / 3); // Divide by scale factor
+      const heightRatio = maxHeight / (imgHeight / 3);
+      const ratio = Math.min(widthRatio, heightRatio);
+
+      const finalWidth = (imgWidth / 3) * ratio;
+      const finalHeight = (imgHeight / 3) * ratio;
+
+      // Center the image
+      const xOffset = (pageWidth - finalWidth) / 2;
+      const yOffset = 30;
+
+      // Add header with branding
+      pdf.setFontSize(18);
+      pdf.setTextColor(124, 26, 135); // Brand color #7c1a87
+      pdf.text('Messagepoint TMS', margin, 15);
+
+      pdf.setFontSize(12);
+      pdf.setTextColor(100, 100, 100);
+      pdf.text('Dashboard Report', margin, 22);
+
+      pdf.setFontSize(9);
+      pdf.setTextColor(120, 120, 120);
+      const date = new Date().toLocaleDateString('en-US', {
+        year: 'numeric',
+        month: 'long',
+        day: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit'
+      });
+      pdf.text(date, pageWidth - margin, 15, { align: 'right' });
+
+      // Add separator line
+      pdf.setDrawColor(200, 200, 200);
+      pdf.setLineWidth(0.5);
+      pdf.line(margin, 25, pageWidth - margin, 25);
+
+      // Add the dashboard image
+      pdf.addImage(
+        dataUrl,
+        'PNG',
+        xOffset,
+        yOffset,
+        finalWidth,
+        finalHeight,
+        undefined,
+        'FAST'
       );
 
-      // Create a blob from the response
-      const blob = new Blob([response.data], { type: "application/pdf" });
+      // Add footer
+      pdf.setFontSize(8);
+      pdf.setTextColor(150, 150, 150);
+      pdf.text(
+        `Page 1 of 1 • Generated on ${new Date().toLocaleString()}`,
+        pageWidth / 2,
+        pageHeight - 5,
+        { align: 'center' }
+      );
 
-      // Create download link
-      const url = window.URL.createObjectURL(blob);
-      const link = document.createElement("a");
-      link.href = url;
-      link.download = `Messagepoint-TMS-Dashboard-${new Date().toISOString().split("T")[0]}.pdf`;
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
+      // Save the PDF
+      const filename = `Messagepoint-TMS-Dashboard-${new Date().toISOString().split("T")[0]}.pdf`;
+      pdf.save(filename);
 
-      // Clean up
-      window.URL.revokeObjectURL(url);
-
-      console.log("Backend PDF export completed!");
+      console.log("High-quality PDF export completed!");
     } catch (error) {
       console.error("Failed to export PDF:", error);
       alert(`Failed to export PDF: ${error instanceof Error ? error.message : "Unknown error"}`);
@@ -360,7 +438,7 @@ export default function DashboardPage() {
     <div className="min-h-screen bg-slate-50 dark:bg-slate-900">
       {/* Header with Export Buttons */}
       <div className="bg-white dark:bg-slate-800 border-b border-slate-200 dark:border-slate-700 px-6 py-4">
-        <div className="flex items-center justify-between">
+        <div className="flex items-center justify-between mb-3">
           <div>
             <h1 className="text-2xl font-bold text-slate-900 dark:text-white">Dashboard</h1>
             <p className="text-sm text-slate-600 dark:text-slate-400">Analytics and insights</p>
@@ -368,21 +446,29 @@ export default function DashboardPage() {
           <div className="flex gap-2">
             <button
               onClick={exportToPNG}
-              className="inline-flex h-9 items-center gap-1.5 rounded-xl border px-3 text-sm font-medium leading-none transition-all duration-150 focus:outline-none focus-visible:ring-2 bg-white/90 text-slate-900 border-slate-300 hover:-translate-y-0.5 hover:bg-white hover:border-slate-400 hover:shadow-sm dark:bg-[#0b1222]/80 dark:text-white dark:border-slate-700/60 dark:hover:bg-[#0e1a2c] dark:hover:border-slate-500"
+              disabled={exportingPng}
+              className="inline-flex h-9 items-center gap-1.5 rounded-xl border px-3 text-sm font-medium leading-none transition-all duration-150 focus:outline-none focus-visible:ring-2 bg-white/90 text-slate-900 border-slate-300 hover:-translate-y-0.5 hover:bg-white hover:border-slate-400 hover:shadow-sm dark:bg-[#0b1222]/80 dark:text-white dark:border-slate-700/60 dark:hover:bg-[#0e1a2c] dark:hover:border-slate-500 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:translate-y-0"
             >
-              <Download className="w-4 h-4" />
-              <span>Export PNG</span>
+              <Download className={`w-4 h-4 ${exportingPng ? 'animate-bounce' : ''}`} />
+              <span>{exportingPng ? "Generating PNG..." : "Export PNG"}</span>
             </button>
             <button
               onClick={exportToPDF}
               disabled={exportingPdf}
               className="inline-flex h-9 items-center gap-1.5 rounded-xl border px-3 text-sm font-medium leading-none transition-all duration-150 focus:outline-none focus-visible:ring-2 bg-white/90 text-slate-900 border-slate-300 hover:-translate-y-0.5 hover:bg-white hover:border-slate-400 hover:shadow-sm dark:bg-[#0b1222]/80 dark:text-white dark:border-slate-700/60 dark:hover:bg-[#0e1a2c] dark:hover:border-slate-500 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:translate-y-0"
             >
-              <Download className="w-4 h-4" />
+              <Download className={`w-4 h-4 ${exportingPdf ? 'animate-bounce' : ''}`} />
               <span>{exportingPdf ? "Generating PDF..." : "Export PDF"}</span>
             </button>
           </div>
         </div>
+
+        {/* Project Filter */}
+        <ProjectFilter
+          projects={projects}
+          selectedProjectIds={selectedProjectIds}
+          onChange={setSelectedProjectIds}
+        />
       </div>
 
       {/* Dashboard Content */}
@@ -440,12 +526,6 @@ export default function DashboardPage() {
           <CompactChartCard title="Project Activity">
             <ProjectActivityChart data={projectActivity} />
           </CompactChartCard>
-        </div>
-
-        {/* Recent Test Runs Table - Real Data */}
-        <div className="bg-white dark:bg-slate-800 rounded-lg shadow-sm border border-slate-200 dark:border-slate-700 p-4">
-          <h3 className="text-base font-semibold text-slate-900 dark:text-white mb-3">Recent Test Runs</h3>
-          <RecentRunsTable data={recentRuns} />
         </div>
       </div>
     </div>
@@ -1762,3 +1842,145 @@ function ProjectActivityChart({ data }: { data: ProjectActivity[] }) {
   return <ReactECharts option={option} style={{ height: "250px" }} />;
 }
 
+// Project Filter Component
+function ProjectFilter({
+  projects,
+  selectedProjectIds,
+  onChange,
+}: {
+  projects: any[];
+  selectedProjectIds: number[];
+  onChange: (ids: number[]) => void;
+}) {
+  const [isOpen, setIsOpen] = useState(false);
+
+  const toggleProject = (projectId: number) => {
+    if (selectedProjectIds.includes(projectId)) {
+      onChange(selectedProjectIds.filter((id) => id !== projectId));
+    } else {
+      onChange([...selectedProjectIds, projectId]);
+    }
+  };
+
+  const selectAll = () => {
+    onChange(projects.map((p) => p.id));
+  };
+
+  const clearAll = () => {
+    onChange([]);
+  };
+
+  const displayText = selectedProjectIds.length === 0
+    ? "All Projects"
+    : selectedProjectIds.length === projects.length
+    ? "All Projects"
+    : `${selectedProjectIds.length} Project${selectedProjectIds.length > 1 ? 's' : ''}`;
+
+  return (
+    <div className="relative">
+      <div className="flex items-center gap-2 flex-wrap">
+        <span className="text-xs font-medium text-slate-600 dark:text-slate-400">Filter:</span>
+
+        {/* Dropdown Button */}
+        <button
+          onClick={() => setIsOpen(!isOpen)}
+          className="inline-flex items-center gap-2 px-3 py-1.5 text-sm font-medium rounded-lg border border-slate-300 bg-white hover:bg-slate-50 dark:bg-slate-900 dark:border-slate-700 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-200 transition-colors"
+        >
+          <Filter className="w-3.5 h-3.5" />
+          <span>{displayText}</span>
+        </button>
+
+        {/* Selected Project Chips */}
+        {selectedProjectIds.length > 0 && selectedProjectIds.length < projects.length && (
+          <div className="flex items-center gap-1.5 flex-wrap">
+            {selectedProjectIds.slice(0, 3).map((id) => {
+              const project = projects.find((p) => p.id === id);
+              if (!project) return null;
+              return (
+                <span
+                  key={id}
+                  className="inline-flex items-center gap-1 px-2 py-0.5 text-xs font-medium rounded-md bg-purple-100 text-purple-800 dark:bg-purple-900/30 dark:text-purple-300"
+                >
+                  {project.name}
+                  <button
+                    onClick={() => toggleProject(id)}
+                    className="hover:bg-purple-200 dark:hover:bg-purple-800 rounded-full p-0.5"
+                  >
+                    <X className="w-3 h-3" />
+                  </button>
+                </span>
+              );
+            })}
+            {selectedProjectIds.length > 3 && (
+              <span className="text-xs text-slate-500 dark:text-slate-400">
+                +{selectedProjectIds.length - 3} more
+              </span>
+            )}
+          </div>
+        )}
+      </div>
+
+      {/* Dropdown Menu */}
+      {isOpen && (
+        <>
+          <div
+            className="fixed inset-0 z-10"
+            onClick={() => setIsOpen(false)}
+          />
+          <div className="absolute top-full left-0 mt-2 w-80 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg shadow-lg z-20 max-h-96 overflow-hidden flex flex-col">
+            {/* Header */}
+            <div className="p-3 border-b border-slate-200 dark:border-slate-700 flex items-center justify-between">
+              <span className="text-sm font-semibold text-slate-900 dark:text-white">
+                Select Projects
+              </span>
+              <div className="flex gap-2">
+                <button
+                  onClick={selectAll}
+                  className="text-xs text-purple-600 dark:text-purple-400 hover:underline"
+                >
+                  All
+                </button>
+                <button
+                  onClick={clearAll}
+                  className="text-xs text-slate-600 dark:text-slate-400 hover:underline"
+                >
+                  Clear
+                </button>
+              </div>
+            </div>
+
+            {/* Project List */}
+            <div className="overflow-y-auto flex-1">
+              {projects.map((project) => {
+                const isSelected = selectedProjectIds.includes(project.id);
+                return (
+                  <label
+                    key={project.id}
+                    className="flex items-center gap-2 px-3 py-2 hover:bg-slate-50 dark:hover:bg-slate-700/50 cursor-pointer"
+                  >
+                    <input
+                      type="checkbox"
+                      checked={isSelected}
+                      onChange={() => toggleProject(project.id)}
+                      className="w-4 h-4 rounded border-slate-300 text-purple-600 focus:ring-purple-500 dark:border-slate-600 dark:bg-slate-700"
+                    />
+                    <div className="flex-1 min-w-0">
+                      <div className="text-sm font-medium text-slate-900 dark:text-white truncate">
+                        {project.name}
+                      </div>
+                      {project.groupName && (
+                        <div className="text-xs text-slate-500 dark:text-slate-400 truncate">
+                          {project.groupName}
+                        </div>
+                      )}
+                    </div>
+                  </label>
+                );
+              })}
+            </div>
+          </div>
+        </>
+      )}
+    </div>
+  );
+}
