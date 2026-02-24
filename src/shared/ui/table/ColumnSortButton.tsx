@@ -60,10 +60,10 @@ export function SortPill({
   const arrow = (
     <svg
       viewBox="0 0 20 20"
-      width="9"
-      height="9"
-      className={`transition-transform ${dir === "asc" ? "rotate-180" : ""} ${
-        active ? "opacity-80" : "opacity-40"
+      width="14"
+      height="14"
+      className={`transition-all duration-200 ${dir === "asc" ? "rotate-180" : ""} ${
+        active ? "opacity-100" : "opacity-40 group-hover:opacity-70"
       }`}
       aria-hidden
     >
@@ -77,12 +77,11 @@ export function SortPill({
       onClick={handle}
       aria-sort={active ? (dir === "asc" ? "ascending" : "descending") : "none"}
       className={[
-        "inline-flex items-center gap-1 rounded-lg px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.12em] transition-all",
-        "border border-transparent text-slate-500 hover:text-slate-800 dark:text-slate-300 dark:hover:text-slate-50",
-        "bg-transparent dark:bg-transparent",
-        active &&
-          "text-slate-900 dark:text-white border-slate-300 dark:border-slate-600 bg-white/80 dark:bg-slate-800/60 shadow-[0_4px_12px_rgba(15,23,42,0.1)] dark:shadow-[0_4px_14px_rgba(2,6,23,0.7)]",
-        "focus:outline-none focus-visible:ring-1 focus-visible:ring-slate-300/60 dark:focus-visible:ring-slate-600/50",
+        "group inline-flex items-center gap-1.5 px-0 py-1 text-[11px] font-semibold uppercase tracking-[0.12em] transition-all",
+        "text-slate-900 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-100",
+        "cursor-pointer",
+        active && "text-black dark:text-white",
+        "focus:outline-none focus-visible:ring-2 focus-visible:ring-slate-400/50 focus-visible:ring-offset-2",
         className,
       ].join(" ")}
       {...rest}

@@ -86,7 +86,7 @@ export default function MilestoneRunsTable({
   const padY = "py-3";
   const rowText = "text-[13px] leading-[1.35]";
   const headLabel =
-    "text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-500 dark:text-slate-300";
+    "text-[11px] font-medium uppercase tracking-[0.14em] text-slate-400 dark:text-slate-500";
   const SELECT_ROW = "bg-emerald-50/80 dark:bg-white/10";
 
   const nextDir = (same: boolean): SortDir =>

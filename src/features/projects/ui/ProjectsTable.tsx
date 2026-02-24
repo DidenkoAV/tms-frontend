@@ -135,7 +135,7 @@ export default function ProjectsTable(props: Props) {
   const padY = "py-3";
   const rowText = "text-sm";
   const headLabel =
-    "text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-500 dark:text-slate-300";
+    "text-[11px] font-medium uppercase tracking-[0.14em] text-slate-400 dark:text-slate-500";
   const starSize = 17;
 
   return (

@@ -278,7 +278,7 @@ export default function MilestoneTable({
   const nav = useNavigate();
   const rowText = "text-sm";
   const headLabel =
-    "text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-500 dark:text-slate-300";
+    "text-[11px] font-medium uppercase tracking-[0.14em] text-slate-400 dark:text-slate-500";
   const padX = "px-4";
   const padY = "py-3";
   const SELECT_ROW = "bg-green-50 dark:bg-white/10";

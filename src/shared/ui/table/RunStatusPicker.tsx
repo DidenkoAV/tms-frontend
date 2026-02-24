@@ -24,23 +24,23 @@ const LABEL: Record<StatusKey, string> = {
 
 const BADGE: Record<StatusKey, string> = {
   PASSED:
-    "text-emerald-700 bg-emerald-50 border border-emerald-300 hover:border-emerald-400 focus:ring-emerald-300 dark:text-emerald-200 dark:bg-emerald-900/40 dark:border-emerald-700 hover:dark:border-emerald-500",
+    "text-emerald-800 bg-emerald-100/80 border border-emerald-400/60 hover:border-emerald-500 focus:ring-emerald-400 dark:text-emerald-300 dark:bg-emerald-950/60 dark:border-emerald-700/80 hover:dark:border-emerald-600",
   RETEST:
-    "text-amber-700 bg-amber-50 border border-amber-300 hover:border-amber-400 focus:ring-amber-300 dark:text-amber-200 dark:bg-amber-900/40 dark:border-amber-700",
+    "text-amber-800 bg-amber-100/80 border border-amber-400/60 hover:border-amber-500 focus:ring-amber-400 dark:text-amber-300 dark:bg-amber-950/60 dark:border-amber-700/80 hover:dark:border-amber-600",
   FAILED:
-    "text-rose-700 bg-rose-50 border border-rose-300 hover:border-rose-400 focus:ring-rose-300 dark:text-rose-200 dark:bg-rose-900/40 dark:border-rose-700",
+    "text-red-800 bg-red-100/80 border border-red-400/60 hover:border-red-500 focus:ring-red-400 dark:text-red-300 dark:bg-red-950/60 dark:border-red-700/80 hover:dark:border-red-600",
   SKIPPED:
-    "text-sky-700 bg-sky-50 border border-sky-300 hover:border-sky-400 focus:ring-sky-300 dark:text-sky-200 dark:bg-sky-900/40 dark:border-sky-700",
+    "text-slate-700 bg-slate-100/80 border border-slate-400/60 hover:border-slate-500 focus:ring-slate-400 dark:text-slate-300 dark:bg-slate-800/60 dark:border-slate-600/80 hover:dark:border-slate-500",
   BROKEN:
-    "text-slate-700 bg-slate-50 border border-slate-300 hover:border-slate-400 focus:ring-slate-300 dark:text-slate-200 dark:bg-slate-800/60 dark:border-slate-700",
+    "text-purple-800 bg-purple-100/80 border border-purple-400/60 hover:border-purple-500 focus:ring-purple-400 dark:text-purple-300 dark:bg-purple-950/60 dark:border-purple-700/80 hover:dark:border-purple-600",
 };
 
 const DOT: Record<StatusKey, string> = {
-  PASSED: "bg-emerald-500 dark:bg-emerald-400",
-  RETEST: "bg-amber-400 dark:bg-amber-300",
-  FAILED: "bg-rose-500 dark:bg-rose-400",
-  SKIPPED: "bg-sky-500 dark:bg-sky-400",
-  BROKEN: "bg-slate-500 dark:bg-slate-300",
+  PASSED: "bg-emerald-600 dark:bg-emerald-500",
+  RETEST: "bg-amber-600 dark:bg-amber-500",
+  FAILED: "bg-red-600 dark:bg-red-500",
+  SKIPPED: "bg-slate-500 dark:bg-slate-400",
+  BROKEN: "bg-purple-600 dark:bg-purple-500",
 };
 
 const DEFAULT_OPTIONS: StatusPickerOption[] = ORDER.map((key) => ({

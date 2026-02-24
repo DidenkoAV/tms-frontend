@@ -21,19 +21,19 @@ const STATUS_ORDER: StatusKey[] = [
 ];
 
 const STATUS_CLASSES: Record<StatusKey, string> = {
-  PASSED: "bg-[#00C47A] dark:bg-[#24E0A7]",
-  FAILED: "bg-[#FF6B81] dark:bg-[#FF7D95]",
-  RETEST: "bg-[#FFD66C] dark:bg-[#FFE19C]",
-  SKIPPED: "bg-[#6ACBFF] dark:bg-[#8CD5FF]",
-  BROKEN: "bg-[#B191FF] dark:bg-[#CDA8FF]",
+  PASSED: "bg-emerald-600 dark:bg-emerald-500",
+  FAILED: "bg-red-600 dark:bg-red-500",
+  RETEST: "bg-amber-600 dark:bg-amber-500",
+  SKIPPED: "bg-slate-500 dark:bg-slate-400",
+  BROKEN: "bg-purple-600 dark:bg-purple-500",
 };
 
 const STATUS_DOTS: Record<StatusKey, string> = {
-  PASSED: "bg-[#00C47A] dark:bg-[#24E0A7]/80",
-  FAILED: "bg-[#FF6B81] dark:bg-[#FF7D95]/80",
-  RETEST: "bg-[#FFD66C] dark:bg-[#FFE19C]/80",
-  SKIPPED: "bg-[#6ACBFF] dark:bg-[#8CD5FF]/80",
-  BROKEN: "bg-[#B191FF] dark:bg-[#CDA8FF]/80",
+  PASSED: "bg-emerald-600 dark:bg-emerald-500",
+  FAILED: "bg-red-600 dark:bg-red-500",
+  RETEST: "bg-amber-600 dark:bg-amber-500",
+  SKIPPED: "bg-slate-500 dark:bg-slate-400",
+  BROKEN: "bg-purple-600 dark:bg-purple-500",
 };
 
 type Props = {
@@ -86,7 +86,7 @@ export function RunBreakdown({
 
   return (
     <div className="flex w-full flex-col gap-1.5">
-      <div className="relative flex h-3.5 overflow-hidden rounded-full bg-slate-200/80 dark:bg-white/15">
+      <div className="relative flex h-2 overflow-hidden rounded-sm bg-slate-200 dark:bg-slate-700/50">
         {segments.length === 0 ? (
           <div className="absolute inset-0 grid text-[10px] text-slate-500 dark:text-slate-400 place-items-center">
             No data
