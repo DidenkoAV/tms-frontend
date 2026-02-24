@@ -3,8 +3,9 @@ import { Navigate, Outlet, useLocation, useOutletContext } from "react-router-do
 import type { AppOutletCtx } from "@/app/types";
 
 export default function PrivateOutlet() {
-  const { authed } = useOutletContext<AppOutletCtx>();
+  const context = useOutletContext<AppOutletCtx>();
   const loc = useLocation();
-  if (!authed) return <Navigate to="/" replace state={{ from: loc }} />;
-  return <Outlet />;
+  if (!context.authed) return <Navigate to="/" replace state={{ from: loc }} />;
+  // Pass context down to child routes
+  return <Outlet context={context} />;
 }

@@ -2,6 +2,7 @@
 import { createBrowserRouter } from "react-router-dom";
 import AppLayout from "@/app/layouts/AppLayout";
 import PrivateOutlet from "@/app/guards/PrivateOutlet";
+import AdminOutlet from "@/app/guards/AdminOutlet";
 
 // Pages
 import LoginPage from "@/pages/LoginPage";
@@ -24,6 +25,8 @@ import ForgotPasswordPage from "@/pages/ForgotPasswordPage";
 import ResetPasswordPage from "@/pages/ResetPasswordPage";
 import ConfirmEmailPage from "@/pages/ConfirmEmailPage";
 import GroupInviteAcceptPage from "@/pages/GroupInviteAcceptPage";
+import AdminPage from "@/pages/AdminPage";
+import DebugMePage from "@/pages/DebugMePage";
 
 const router = createBrowserRouter([
   {
@@ -66,6 +69,15 @@ const router = createBrowserRouter([
           },
 
           { path: "account", element: <AccountPage /> },
+          { path: "debug-me", element: <DebugMePage /> },
+
+          // Admin routes (protected by AdminOutlet - requires ROLE_ADMIN)
+          {
+            element: <AdminOutlet />,
+            children: [
+              { path: "admin", element: <AdminPage /> },
+            ],
+          },
         ],
       },
     ],

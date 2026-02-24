@@ -3,4 +3,5 @@ export { Logo } from "./Logo";
 export { ThemeToggle } from "./ThemeToggle";
 export { UserMenu } from "./UserMenu";
 export { ProjectsLink } from "./ProjectsLink";
+export { AdminLink } from "./AdminLink";
 

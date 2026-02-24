@@ -5,7 +5,7 @@ import { http, setAuthToken } from "@/lib/http";
 import { getTheme, setTheme as setAppTheme } from "@/lib/theme";
 
 // Layout components
-import { Logo, ThemeToggle, ProjectsLink, UserMenu } from "@/shared/ui/layout/Header";
+import { Logo, ThemeToggle, ProjectsLink, UserMenu, AdminLink } from "@/shared/ui/layout/Header";
 
 import type { AppOutletCtx } from "@/app/types";
 import { isPublicRoute } from "@/app/config/constants";
@@ -18,7 +18,7 @@ export default function App() {
   const showHeader = useMemo(() => !isPublicRoute(pathname), [pathname]);
 
   type AuthStatus = "loading" | "guest" | "user";
-  const [me, setMe] = useState<{ fullName?: string | null; email?: string | null } | null>(null);
+  const [me, setMe] = useState<{ fullName?: string | null; email?: string | null; roles?: string[] } | null>(null);
   const [status, setStatus] = useState<AuthStatus>("loading");
 
   const bootOnce = useRef(false);
@@ -50,7 +50,7 @@ export default function App() {
   const loadMe = useCallback(async () => {
     try {
       const r = await http.get("/api/auth/me");
-      setMe({ fullName: r.data.fullName, email: r.data.email });
+      setMe({ fullName: r.data.fullName, email: r.data.email, roles: r.data.roles });
       setStatus("user");
     } catch (err) {
       // Silent fail - user is not authenticated
@@ -147,6 +147,7 @@ export default function App() {
 
             <nav className="flex items-center gap-3 ml-auto">
               {authed && <ProjectsLink />}
+              {authed && me?.roles?.includes("ROLE_ADMIN") && <AdminLink />}
               {authed && (
                 <UserMenu
                   fullName={me?.fullName}
