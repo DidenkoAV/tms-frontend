@@ -369,22 +369,19 @@ export default function GroupsSection({
               {canManageMembers(selected) && (
                 <div className="mb-4">
                   <Field label="Invite member by email">
-                    <div className="flex items-start gap-2">
-                      <div className="flex-1 max-w-md">
-                        <Input
-                          value={inviteEmail}
-                          onChange={(e) => setInviteEmail(e.target.value)}
-                          placeholder="user@example.com"
-                        />
-                      </div>
-                      <div className="flex shrink-0 gap-2 pt-[3px]">
-                        <button
-                          onClick={() => invite(selected!)}
-                          className="rounded-md border border-slate-300 bg-slate-100 px-3 py-1.5 text-xs font-medium text-slate-700 transition hover:bg-slate-200 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200 dark:hover:bg-slate-700"
-                        >
-                          Invite
-                        </button>
-                      </div>
+                    <div className="flex items-center gap-2">
+                      <Input
+                        value={inviteEmail}
+                        onChange={(e) => setInviteEmail(e.target.value)}
+                        placeholder="user@example.com"
+                        className="flex-1"
+                      />
+                      <button
+                        onClick={() => invite(selected!)}
+                        className="rounded-md border border-slate-300 bg-slate-100 px-3 py-1.5 text-xs font-medium text-slate-700 transition hover:bg-slate-200 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200 dark:hover:bg-slate-700"
+                      >
+                        Invite
+                      </button>
                     </div>
                   </Field>
                 </div>

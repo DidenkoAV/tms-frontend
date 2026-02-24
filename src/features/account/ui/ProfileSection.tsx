@@ -141,16 +141,15 @@ export default function ProfileSection({
       {/* Name field */}
       <form onSubmit={saveName}>
         <Field label="Full name">
-          <div className="flex items-start gap-2">
-            <div className="flex-1 max-w-md">
-              <Input
-                value={nameEdit}
-                onChange={(e) => setNameEdit(e.target.value)}
-                placeholder="Your name"
-                disabled={!isEditingName}
-              />
-            </div>
-            <div className="flex shrink-0 gap-2 pt-[3px]">
+          <div className="flex items-center gap-2">
+            <Input
+              value={nameEdit}
+              onChange={(e) => setNameEdit(e.target.value)}
+              placeholder="Your name"
+              disabled={!isEditingName}
+              className="flex-1"
+            />
+            <div className="flex shrink-0 gap-2">
               {!isEditingName ? (
                 <button
                   type="button"
@@ -186,7 +185,7 @@ export default function ProfileSection({
       <form onSubmit={saveEmail}>
         <Field label="Email">
           <div className="flex items-start gap-2">
-            <div className="flex-1 max-w-md">
+            <div className="flex-1">
               <Input
                 type="email"
                 value={emailEdit}
@@ -198,7 +197,7 @@ export default function ProfileSection({
                 Changing email will send a confirmation link to the new address.
               </p>
             </div>
-            <div className="flex shrink-0 gap-2 pt-[3px]">
+            <div className="flex shrink-0 gap-2">
               {!isEditingEmail ? (
                 <button
                   type="button"
