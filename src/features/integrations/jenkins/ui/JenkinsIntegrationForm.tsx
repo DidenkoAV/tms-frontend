@@ -393,7 +393,7 @@ export default function JenkinsIntegrationForm({
                           </div>
                           <button
                             type="button"
-                            className="flex-shrink-0 w-16 h-8 px-2 text-sm font-medium transition-all duration-200 rounded-lg text-rose-600 hover:text-rose-700 hover:bg-rose-50 dark:text-rose-400 dark:hover:text-rose-300 dark:hover:bg-rose-900/30"
+                            className="rounded-md border border-rose-300 bg-rose-50 px-3 py-1.5 text-xs font-medium text-rose-700 transition hover:bg-rose-100 dark:border-rose-800 dark:bg-rose-900/20 dark:text-rose-300 dark:hover:bg-rose-900/40"
                             onClick={() => removeJob(idx)}
                           >
                             Remove
@@ -408,16 +408,29 @@ export default function JenkinsIntegrationForm({
           </div>
 
           <div className="flex gap-2 pt-4 border-t border-slate-200 dark:border-slate-700">
-            <ButtonPrimary type="submit">Save</ButtonPrimary>
+            <button
+              type="submit"
+              className="rounded-md bg-slate-900 px-3 py-1.5 text-xs font-medium text-white transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-50 dark:bg-slate-100 dark:text-slate-900 dark:hover:bg-slate-200"
+            >
+              Save
+            </button>
 
             {hasSavedToken && (
               <>
-                <ButtonPrimary type="button" onClick={onTest}>
+                <button
+                  type="button"
+                  onClick={onTest}
+                  className="rounded-md border border-slate-300 bg-slate-100 px-3 py-1.5 text-xs font-medium text-slate-700 transition hover:bg-slate-200 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200 dark:hover:bg-slate-700"
+                >
                   Test
-                </ButtonPrimary>
-                <ButtonDangerOutline type="button" onClick={onRemove}>
+                </button>
+                <button
+                  type="button"
+                  onClick={onRemove}
+                  className="rounded-md border border-rose-300 bg-rose-50 px-3 py-1.5 text-xs font-medium text-rose-700 transition hover:bg-rose-100 dark:border-rose-800 dark:bg-rose-900/20 dark:text-rose-300 dark:hover:bg-rose-900/40"
+                >
                   Remove
-                </ButtonDangerOutline>
+                </button>
               </>
             )}
           </div>

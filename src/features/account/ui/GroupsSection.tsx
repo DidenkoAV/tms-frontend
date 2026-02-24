@@ -367,17 +367,26 @@ export default function GroupsSection({
 
               {/* invite — only who can manage members (OWNER) */}
               {canManageMembers(selected) && (
-                <div className="mb-4 grid gap-3 md:grid-cols-[1fr_auto]">
+                <div className="mb-4">
                   <Field label="Invite member by email">
-                    <Input
-                      value={inviteEmail}
-                      onChange={(e) => setInviteEmail(e.target.value)}
-                      placeholder="user@example.com"
-                    />
+                    <div className="flex items-start gap-2">
+                      <div className="flex-1 max-w-md">
+                        <Input
+                          value={inviteEmail}
+                          onChange={(e) => setInviteEmail(e.target.value)}
+                          placeholder="user@example.com"
+                        />
+                      </div>
+                      <div className="flex shrink-0 gap-2 pt-[3px]">
+                        <button
+                          onClick={() => invite(selected!)}
+                          className="rounded-md border border-slate-300 bg-slate-100 px-3 py-1.5 text-xs font-medium text-slate-700 transition hover:bg-slate-200 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200 dark:hover:bg-slate-700"
+                        >
+                          Invite
+                        </button>
+                      </div>
+                    </div>
                   </Field>
-                  <div className="flex items-end">
-                    <ButtonPrimary onClick={() => invite(selected!)}>Invite</ButtonPrimary>
-                  </div>
                 </div>
               )}
 
@@ -455,25 +464,27 @@ export default function GroupsSection({
                               {canManageMembers(selected) && !isOwnerRow && (
                                 <>
                                   {isActive && (
-                                    <ButtonDangerOutline
+                                    <button
                                       onClick={() => removeMember(selected, m)}
+                                      className="rounded-md border border-rose-300 bg-rose-50 px-3 py-1.5 text-xs font-medium text-rose-700 transition hover:bg-rose-100 dark:border-rose-800 dark:bg-rose-900/20 dark:text-rose-300 dark:hover:bg-rose-900/40"
                                     >
                                       Remove
-                                    </ButtonDangerOutline>
+                                    </button>
                                   )}
                                   {m.status === "PENDING" && (
                                     <div className="inline-flex gap-2">
                                       <button
-                                        className="rounded-md border px-2.5 py-1.5 text-xs transition bg-slate-100 border-slate-300 hover:bg-slate-50 dark:bg-slate-800 dark:border-slate-700"
+                                        className="rounded-md border border-slate-300 bg-slate-100 px-3 py-1.5 text-xs font-medium text-slate-700 transition hover:bg-slate-200 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200 dark:hover:bg-slate-700"
                                         onClick={() => resendInvite(selected, m)}
                                       >
                                         Resend
                                       </button>
-                                      <ButtonDangerOutline
+                                      <button
                                         onClick={() => cancelInvite(selected, m)}
+                                        className="rounded-md border border-rose-300 bg-rose-50 px-3 py-1.5 text-xs font-medium text-rose-700 transition hover:bg-rose-100 dark:border-rose-800 dark:bg-rose-900/20 dark:text-rose-300 dark:hover:bg-rose-900/40"
                                       >
                                         Cancel
-                                      </ButtonDangerOutline>
+                                      </button>
                                     </div>
                                   )}
                                 </>
@@ -496,9 +507,12 @@ export default function GroupsSection({
                 {/* leave */}
                 <div className="mt-3">
                   {!isOwner(selected) && (
-                    <ButtonDangerOutline onClick={() => leaveGroup(selected!)}>
+                    <button
+                      onClick={() => leaveGroup(selected!)}
+                      className="rounded-md border border-rose-300 bg-rose-50 px-3 py-1.5 text-xs font-medium text-rose-700 transition hover:bg-rose-100 dark:border-rose-800 dark:bg-rose-900/20 dark:text-rose-300 dark:hover:bg-rose-900/40"
+                    >
                       Leave group
-                    </ButtonDangerOutline>
+                    </button>
                   )}
                 </div>
               </div>

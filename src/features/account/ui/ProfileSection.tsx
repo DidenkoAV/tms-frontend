@@ -25,6 +25,8 @@ export default function ProfileSection({
   const [emailEdit, setEmailEdit] = useState("");
   const [savingProfile, setSavingProfile] = useState(false);
   const [profileMsg, setProfileMsg] = useState<{ type: "ok" | "warn" | "err"; text: string } | null>(null);
+  const [isEditingName, setIsEditingName] = useState(false);
+  const [isEditingEmail, setIsEditingEmail] = useState(false);
 
   useEffect(() => {
     if (me) {
@@ -35,7 +37,8 @@ export default function ProfileSection({
 
   const emailChanged = !!me && emailEdit.trim().toLowerCase() !== (me.email || "").trim().toLowerCase();
   const nameChanged = !!me && nameEdit.trim() !== (me.fullName || "");
-  const canSaveProfile = !!me && (emailChanged || nameChanged) && !savingProfile;
+  const canSaveName = !!me && nameChanged && !savingProfile;
+  const canSaveEmail = !!me && emailChanged && !savingProfile;
 
   function isEmailValid(v: string) {
     const x = v.trim();
@@ -43,37 +46,62 @@ export default function ProfileSection({
     return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(x);
   }
 
-  async function saveProfile(e: React.FormEvent) {
+  async function saveName(e: React.FormEvent) {
     e.preventDefault();
-    if (!me) return;
+    if (!me || !nameChanged) return;
     setProfileMsg(null);
     setSavingProfile(true);
     try {
-      // update full name
-      if (nameChanged) {
-        await http.post("/api/auth/profile/full-name", { fullName: nameEdit.trim() });
-        setMe((prev) => (prev ? { ...prev, fullName: nameEdit.trim() } : prev));
-      }
-      // start email change flow
-      if (emailChanged) {
-        const next = emailEdit.trim();
-        if (!isEmailValid(next)) throw new Error("Invalid email format");
-        await http.post("/api/auth/profile/email/change", { newEmail: next });
-        // keep original in input (change will apply after confirmation)
-        setEmailEdit(me.email || "");
-        setProfileMsg({
-          type: "ok",
-          text: `Confirmation link was sent to ${next}. Please check your inbox to complete the email change.`,
-        });
-      } else if (nameChanged) {
-        setProfileMsg({ type: "ok", text: "Profile saved." });
-      }
+      await http.post("/api/auth/profile/full-name", { fullName: nameEdit.trim() });
+      setMe((prev) => (prev ? { ...prev, fullName: nameEdit.trim() } : prev));
+      setProfileMsg({ type: "ok", text: "Name updated successfully." });
+      setIsEditingName(false);
     } catch (e: any) {
-      const msg = e?.response?.data?.message || e?.message || "Failed to save profile";
+      const msg = e?.response?.data?.message || e?.message || "Failed to update name";
       setProfileMsg({ type: "err", text: msg });
     } finally {
       setSavingProfile(false);
     }
+  }
+
+  async function saveEmail(e: React.FormEvent) {
+    e.preventDefault();
+    if (!me || !emailChanged) return;
+    setProfileMsg(null);
+    setSavingProfile(true);
+    try {
+      const next = emailEdit.trim();
+      if (!isEmailValid(next)) throw new Error("Invalid email format");
+      await http.post("/api/auth/profile/email/change", { newEmail: next });
+      // keep original in input (change will apply after confirmation)
+      setEmailEdit(me.email || "");
+      setProfileMsg({
+        type: "ok",
+        text: `Confirmation link was sent to ${next}. Please check your inbox to complete the email change.`,
+      });
+      setIsEditingEmail(false);
+    } catch (e: any) {
+      const msg = e?.response?.data?.message || e?.message || "Failed to update email";
+      setProfileMsg({ type: "err", text: msg });
+    } finally {
+      setSavingProfile(false);
+    }
+  }
+
+  function handleCancelName() {
+    setIsEditingName(false);
+    if (me) {
+      setNameEdit(me.fullName || "");
+    }
+    setProfileMsg(null);
+  }
+
+  function handleCancelEmail() {
+    setIsEditingEmail(false);
+    if (me) {
+      setEmailEdit(me.email || "");
+    }
+    setProfileMsg(null);
   }
 
   function formatJoinDate(dateString: string) {
@@ -110,30 +138,96 @@ export default function ProfileSection({
         </div>
       )}
 
-      <form onSubmit={saveProfile} className="space-y-3">
+      {/* Name field */}
+      <form onSubmit={saveName}>
         <Field label="Full name">
-          <Input
-            value={nameEdit}
-            onChange={(e) => setNameEdit(e.target.value)}
-            placeholder="Your name"
-          />
+          <div className="flex items-start gap-2">
+            <div className="flex-1 max-w-md">
+              <Input
+                value={nameEdit}
+                onChange={(e) => setNameEdit(e.target.value)}
+                placeholder="Your name"
+                disabled={!isEditingName}
+              />
+            </div>
+            <div className="flex shrink-0 gap-2 pt-[3px]">
+              {!isEditingName ? (
+                <button
+                  type="button"
+                  onClick={() => setIsEditingName(true)}
+                  className="rounded-md border border-slate-300 bg-slate-100 px-3 py-1.5 text-xs font-medium text-slate-700 transition hover:bg-slate-200 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200 dark:hover:bg-slate-700"
+                >
+                  Change
+                </button>
+              ) : (
+                <>
+                  <button
+                    type="submit"
+                    disabled={!canSaveName}
+                    className="rounded-md bg-slate-900 px-3 py-1.5 text-xs font-medium text-white transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-50 dark:bg-slate-100 dark:text-slate-900 dark:hover:bg-slate-200"
+                  >
+                    {savingProfile ? "Saving…" : "Save"}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleCancelName}
+                    className="rounded-md border border-slate-300 bg-slate-100 px-3 py-1.5 text-xs font-medium text-slate-700 transition hover:bg-slate-200 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200 dark:hover:bg-slate-700"
+                  >
+                    Cancel
+                  </button>
+                </>
+              )}
+            </div>
+          </div>
         </Field>
+      </form>
+
+      {/* Email field */}
+      <form onSubmit={saveEmail}>
         <Field label="Email">
-          <Input
-            type="email"
-            value={emailEdit}
-            onChange={(e) => setEmailEdit(e.target.value)}
-            placeholder="you@example.com"
-          />
-          <p className="mt-1 text-[11px] text-slate-500 dark:text-slate-500">
-            Changing email will send a confirmation link to the new address.
-          </p>
+          <div className="flex items-start gap-2">
+            <div className="flex-1 max-w-md">
+              <Input
+                type="email"
+                value={emailEdit}
+                onChange={(e) => setEmailEdit(e.target.value)}
+                placeholder="you@example.com"
+                disabled={!isEditingEmail}
+              />
+              <p className="mt-1 text-[11px] text-slate-500 dark:text-slate-500">
+                Changing email will send a confirmation link to the new address.
+              </p>
+            </div>
+            <div className="flex shrink-0 gap-2 pt-[3px]">
+              {!isEditingEmail ? (
+                <button
+                  type="button"
+                  onClick={() => setIsEditingEmail(true)}
+                  className="rounded-md border border-slate-300 bg-slate-100 px-3 py-1.5 text-xs font-medium text-slate-700 transition hover:bg-slate-200 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200 dark:hover:bg-slate-700"
+                >
+                  Change
+                </button>
+              ) : (
+                <>
+                  <button
+                    type="submit"
+                    disabled={!canSaveEmail}
+                    className="rounded-md bg-slate-900 px-3 py-1.5 text-xs font-medium text-white transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-50 dark:bg-slate-100 dark:text-slate-900 dark:hover:bg-slate-200"
+                  >
+                    {savingProfile ? "Saving…" : "Save"}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleCancelEmail}
+                    className="rounded-md border border-slate-300 bg-slate-100 px-3 py-1.5 text-xs font-medium text-slate-700 transition hover:bg-slate-200 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200 dark:hover:bg-slate-700"
+                  >
+                    Cancel
+                  </button>
+                </>
+              )}
+            </div>
+          </div>
         </Field>
-        <div className="flex gap-2 pt-1">
-          <ButtonPrimary disabled={!canSaveProfile}>
-            {savingProfile ? "Saving…" : "Save"}
-          </ButtonPrimary>
-        </div>
       </form>
 
       {me && (

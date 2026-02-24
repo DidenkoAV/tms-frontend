@@ -189,9 +189,13 @@ export default function PasswordSection({
 
         {/* Button */}
         <div className="pt-2">
-          <ButtonPrimary disabled={!canSubmit}>
+          <button
+            type="submit"
+            disabled={!canSubmit}
+            className="rounded-md bg-slate-900 px-3 py-1.5 text-xs font-medium text-white transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-50 dark:bg-slate-100 dark:text-slate-900 dark:hover:bg-slate-200"
+          >
             {saving ? "Updating…" : "Update password"}
-          </ButtonPrimary>
+          </button>
         </div>
       </form>
 
