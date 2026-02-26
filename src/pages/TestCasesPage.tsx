@@ -648,7 +648,10 @@ export default function TestCasesPage() {
                 />
                 {/* Render child suites only when parent is open */}
                 {open && childSuites.length > 0 && (
-                  <div className="mt-3 pl-4 space-y-3 border-l-2 border-slate-200 dark:border-slate-700">
+                  <div className={suiteCases.length > 0
+                    ? "mt-3 pl-4 space-y-3 border-l-2 border-slate-200 dark:border-slate-700"
+                    : "mt-3 space-y-3"
+                  }>
                     {childSuites.map(child => renderSuiteWithChildren(child))}
                   </div>
                 )}

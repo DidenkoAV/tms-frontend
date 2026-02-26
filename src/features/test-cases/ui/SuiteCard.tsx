@@ -156,17 +156,19 @@ export default function SuiteCard(props: SuiteCardProps) {
       {/* body */}
       {open && (
         <div className="px-4 pb-3">
-          {/* Table header - always show when suite is open */}
-          <div className="mb-2 rounded-xl border border-slate-200 bg-white px-3 py-2 dark:border-slate-800 dark:bg-[#0b1222]">
-            <div className="grid gap-2" style={{ gridTemplateColumns: gridCols }}>
-              <div className="text-[11px] uppercase tracking-wide text-slate-500 dark:text-slate-400">Case</div>
-              {cols.priority  && <div className="text-[11px] uppercase tracking-wide text-slate-500 dark:text-slate-400">Priority</div>}
-              {cols.type      && <div className="text-[11px] uppercase tracking-wide text-slate-500 dark:text-slate-400">Type</div>}
-              {cols.automation&& <div className="text-[11px] uppercase tracking-wide text-slate-500 dark:text-slate-400">Automation</div>}
-              {cols.author    && <div className="text-[11px] uppercase tracking-wide text-slate-500 dark:text-slate-400">Author</div>}
-              <div />
+          {/* Table header - only show when there are cases (not just child suites) */}
+          {itemsCount > 0 && (
+            <div className="mb-2 rounded-xl border border-slate-200 bg-white px-3 py-2 dark:border-slate-800 dark:bg-[#0b1222]">
+              <div className="grid gap-2" style={{ gridTemplateColumns: gridCols }}>
+                <div className="text-[11px] uppercase tracking-wide text-slate-500 dark:text-slate-400">Case</div>
+                {cols.priority  && <div className="text-[11px] uppercase tracking-wide text-slate-500 dark:text-slate-400">Priority</div>}
+                {cols.type      && <div className="text-[11px] uppercase tracking-wide text-slate-500 dark:text-slate-400">Type</div>}
+                {cols.automation&& <div className="text-[11px] uppercase tracking-wide text-slate-500 dark:text-slate-400">Automation</div>}
+                {cols.author    && <div className="text-[11px] uppercase tracking-wide text-slate-500 dark:text-slate-400">Author</div>}
+                <div />
+              </div>
             </div>
-          </div>
+          )}
 
           {/* Cases list or empty state */}
           {itemsCount > 0 ? (
