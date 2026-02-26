@@ -560,6 +560,7 @@ export default function TestCasesPage() {
         {!q.trim() && (
           <CaseSuiteCard
             suiteKey="project"
+            suiteId={0}
             title="No suite"
             icon={<FolderIcon className="text-slate-600 dark:text-slate-300" />}
             description={`${projectCases.length} case(s)`}
@@ -613,6 +614,7 @@ export default function TestCasesPage() {
               <div key={suiteKey}>
                 <CaseSuiteCard
                   suiteKey={suiteKey}
+                  suiteId={s.id}
                   title={displayTitle}
                   icon={<FolderIcon className="text-slate-700 dark:text-slate-300" />}
                   description={`${totalCasesCount} case(s)`}

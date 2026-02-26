@@ -1,5 +1,7 @@
 import type { ReactNode } from "react";
+import { useRef, useEffect } from "react";
 import { TFCheckbox } from "@/shared/ui/table";
+import InlineEditCell from "@/shared/ui/table/InlineEditCell";
 import { ChevronRightIcon, EditIcon, PlusIcon } from "@/shared/ui/icons";
 
 const pillSm =
@@ -10,6 +12,7 @@ const pillSm =
 
 export type SuiteCardProps = {
   zoneKey: string;
+  suiteId: number;
   title: ReactNode | string;
   icon: ReactNode;
   description?: string | null;
@@ -44,7 +47,7 @@ export type SuiteCardProps = {
   isRenaming: boolean;
   renameName: string;
   setRenameName: (s: string) => void;
-  onSaveRename: () => void;
+  onSaveRename: (id: number) => void;
   onCancelRename: () => void;
 
   // grid template for header
@@ -53,7 +56,7 @@ export type SuiteCardProps = {
 
 export default function SuiteCard(props: SuiteCardProps) {
   const {
-    zoneKey, title, icon, description, children, open, onToggle, onAdd, onAddSubsuite, depth = 0,
+    zoneKey, suiteId, title, icon, description, children, open, onToggle, onAdd, onAddSubsuite, depth = 0,
     sortDir, onToggleSort, onDragOver, onDrop, cols, itemsCount, hasChildSuites = false,
     suiteSelectable, suiteChecked, suiteIndeterminate, onSuiteCheck,
     showRename, onStartRename, isRenaming, renameName, setRenameName, onSaveRename, onCancelRename,
@@ -70,7 +73,11 @@ export default function SuiteCard(props: SuiteCardProps) {
     >
       {/* header */}
       <div className="px-4 py-3">
-        <div className="flex items-center justify-between">
+        <div
+          className="flex items-center justify-between cursor-pointer"
+          onClick={onToggle}
+          title={open ? "Click to collapse" : "Click to expand"}
+        >
           <div className="inline-flex items-center min-w-0 gap-3">
             {suiteSelectable && (
               <TFCheckbox
@@ -79,6 +86,7 @@ export default function SuiteCard(props: SuiteCardProps) {
                 onChange={onSuiteCheck}
                 title={suiteChecked ? "Unselect suite" : "Select suite"}
                 size={18}
+                onClick={(e) => e.stopPropagation()}
               />
             )}
 
@@ -88,7 +96,10 @@ export default function SuiteCard(props: SuiteCardProps) {
 
             <button
               type="button"
-              onClick={onToggle}
+              onClick={(e) => {
+                e.stopPropagation();
+                onToggle();
+              }}
               className="inline-flex items-center justify-center flex-none w-8 h-8 rounded text-slate-400 hover:text-slate-700 dark:text-slate-300"
               aria-expanded={open}
               title={open ? "Collapse" : "Expand"}
@@ -96,43 +107,28 @@ export default function SuiteCard(props: SuiteCardProps) {
               <ChevronRightIcon className={`transition-transform ${open ? "rotate-90" : ""}`} />
             </button>
 
-            <span className="min-w-0">
-              {!isRenaming ? (
-                <>
-                  <span className="block text-base font-semibold truncate text-slate-900 dark:text-white">
-                    {title}
-                  </span>
-                  {description && (
-                    <span className="block text-xs truncate text-slate-500 dark:text-slate-400">
-                      {description}
-                    </span>
-                  )}
-                </>
-              ) : (
-                <span className="inline-flex items-center gap-2">
-                  <input
-                    className="w-[20rem] max-w-full rounded-xl border border-slate-300 bg-white px-2 py-1 text-sm outline-none focus:border-slate-400 dark:border-slate-700 dark:bg-slate-900"
-                    value={renameName}
-                    onChange={(e) => setRenameName(e.target.value)}
-                    onClick={(e) => e.stopPropagation()}
-                  />
-                  <button
-                    onClick={(e) => { e.stopPropagation(); onSaveRename(); }}
-                    disabled={!renameName.trim()}
-                    className="rounded-full border px-2.5 py-1 text-xs font-semibold text-white border-slate-300 bg-slate-900 disabled:opacity-50 dark:text-black dark:bg-white dark:border-slate-500"
-                    title="Save"
-                  >✓</button>
-                  <button
-                    onClick={(e) => { e.stopPropagation(); onCancelRename(); }}
-                    className="px-2 py-1 text-xs border rounded-2xl border-slate-300 dark:border-slate-600"
-                    title="Cancel"
-                  >✕</button>
+            <div className="min-w-0 flex flex-col" onClick={(e) => e.stopPropagation()}>
+              <InlineEditCell
+                id={suiteId}
+                value={typeof title === 'string' ? title : String(title)}
+                isEditing={isRenaming}
+                draft={renameName}
+                setDraft={setRenameName}
+                onSave={onSaveRename}
+                onCancel={onCancelRename}
+                fontSize="text-base"
+                onViewClick={onStartRename}
+                viewClassName="font-semibold"
+              />
+              {description && !isRenaming && (
+                <span className="block text-xs truncate text-slate-500 dark:text-slate-400">
+                  {description}
                 </span>
               )}
-            </span>
+            </div>
           </div>
 
-          <div className="flex items-center flex-none gap-2 ml-3">
+          <div className="flex items-center flex-none gap-2 ml-3" onClick={(e) => e.stopPropagation()}>
             <button type="button" onClick={onAdd} className={pillSm} title="Add case">
               <PlusIcon /> Case
             </button>

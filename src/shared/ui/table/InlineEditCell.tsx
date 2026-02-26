@@ -71,8 +71,10 @@ export default function InlineEditCell({
       {/* input */}
       <input
         ref={inputRef}
-        className="w-full max-w-[220px] truncate rounded border border-slate-300 bg-white px-2 py-1 text-sm
-                   outline-none focus:border-slate-400 dark:border-slate-600 dark:bg-slate-800 dark:text-white"
+        className="w-full max-w-[600px] truncate rounded-lg border-2 border-blue-400 bg-white px-3 py-1.5 text-[15px] font-medium
+                   outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-200
+                   dark:border-blue-500 dark:bg-slate-800 dark:text-white dark:focus:ring-blue-900/50
+                   transition-all"
         value={draft}
         onChange={(e) => setDraft(e.target.value)}
         onClick={(e) => e.stopPropagation()}
@@ -89,35 +91,44 @@ export default function InlineEditCell({
       />
 
       {/* floating toolbar */}
-      <div className="absolute left-1/2 -translate-x-1/2 top-0 -translate-y-full mb-1 flex gap-1 
-                      rounded-lg bg-white/95 dark:bg-slate-800/95 px-1.5 py-1 shadow-md z-30 transition">
-        {/* Save button (outline, hover fill black) */}
+      <div className="absolute left-1/2 -translate-x-1/2 top-0 -translate-y-full mb-2 flex gap-1.5
+                      rounded-lg bg-white dark:bg-slate-800 px-1.5 py-1 shadow-lg border border-slate-200 dark:border-slate-700 z-30">
+        {/* Save button */}
         <button
           onClick={(e) => {
             e.stopPropagation();
             onSave(id);
           }}
           disabled={!draft.trim() || saving}
-          className="flex h-5 w-5 items-center justify-center rounded-full border border-slate-900 
-                     text-slate-900 text-[11px] hover:bg-slate-900 hover:text-white 
-                     disabled:opacity-40"
-          title="Save"
+          className="flex items-center gap-1 px-2 py-0.5 rounded text-xs font-medium
+                     bg-slate-900 text-white hover:bg-slate-700
+                     dark:bg-white dark:text-slate-900 dark:hover:bg-slate-200
+                     disabled:opacity-40 disabled:cursor-not-allowed
+                     transition-colors"
+          title="Save (Enter)"
         >
-          ✓
+          <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7" />
+          </svg>
+          Save
         </button>
 
-        {/* Cancel button (outline grey, hover red) */}
+        {/* Cancel button */}
         <button
           onClick={(e) => {
             e.stopPropagation();
             onCancel();
           }}
-          className="flex h-5 w-5 items-center justify-center rounded-full border 
-                     border-slate-400 text-slate-500 text-[11px] hover:border-red-500 hover:text-red-500
-                     dark:border-slate-500 dark:text-slate-300"
-          title="Cancel"
+          className="flex items-center gap-1 px-2 py-0.5 rounded text-xs font-medium
+                     bg-slate-200 text-slate-700 hover:bg-slate-300
+                     dark:bg-slate-700 dark:text-slate-300 dark:hover:bg-slate-600
+                     transition-colors"
+          title="Cancel (Esc)"
         >
-          ✕
+          <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M6 18L18 6M6 6l12 12" />
+          </svg>
+          Cancel
         </button>
       </div>
     </div>

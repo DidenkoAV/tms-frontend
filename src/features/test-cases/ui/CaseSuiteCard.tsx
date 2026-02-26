@@ -11,12 +11,13 @@ type RenameControls = {
   isRenaming: boolean;
   renameName: string;
   setRenameName: (s: string) => void;
-  onSaveRename: () => void;
+  onSaveRename: (id: number) => void;
   onCancelRename: () => void;
 };
 
 type CaseSuiteCardProps = {
   suiteKey: string;
+  suiteId: number;
   title: ReactNode;
   icon: ReactNode;
   description: string;
@@ -44,6 +45,7 @@ const noop = () => undefined;
 
 export default function CaseSuiteCard({
   suiteKey,
+  suiteId,
   title,
   icon,
   description,
@@ -72,6 +74,7 @@ export default function CaseSuiteCard({
   return (
     <SuiteCard
       zoneKey={suiteKey}
+      suiteId={suiteId}
       title={title}
       icon={icon}
       description={description}
