@@ -2,6 +2,15 @@
 html[data-theme="light"] { color-scheme: light; }
 html[data-theme="dark"]  { color-scheme: dark; }
 
+/* Disable all transitions during theme change to prevent flickering */
+.theme-transitioning,
+.theme-transitioning *,
+.theme-transitioning *::before,
+.theme-transitioning *::after {
+  transition: none !important;
+  animation-duration: 0s !important;
+}
+
 /* Fade-in animation for components */
 .animate-in {
   animation: _fade_120ms ease-out forwards;

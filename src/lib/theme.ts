@@ -10,8 +10,18 @@ export const getTheme = (): Theme => {
 
 export const applyTheme = (t: Theme) => {
   const root = document.documentElement;
+
+  // Disable all transitions during theme change to prevent flickering
+  root.classList.add("theme-transitioning");
+
   root.classList.toggle("dark", t === "dark"); // Tailwind .dark
   root.setAttribute("data-theme", t);          // For color-scheme/custom variables
+
+  // Re-enable transitions after theme is applied
+  // Use setTimeout to ensure the theme change is rendered first
+  setTimeout(() => {
+    root.classList.remove("theme-transitioning");
+  }, 0);
 };
 
 export const setTheme = (t: Theme) => {
