@@ -118,7 +118,7 @@ export default function CaseRow({
   return (
     <li
       className={[
-        "px-3 py-2 rounded-xl transition-colors",
+        "px-3 py-2 rounded-xl transition-colors cursor-pointer",
         rowHighlight || "hover:bg-slate-50 dark:hover:bg-slate-900/50",
       ].join(" ")}
       draggable
@@ -126,6 +126,8 @@ export default function CaseRow({
         e.dataTransfer.setData("text/plain", String(c.id));
         e.dataTransfer.effectAllowed = "move";
       }}
+      onClick={() => onOpen()}
+      title="Click to open case"
     >
       <div className="grid gap-2" style={{ gridTemplateColumns: gridCols }}>
         {/* TITLE */}
@@ -135,10 +137,12 @@ export default function CaseRow({
             onChange={handleCheck}
             title={checked ? "Unselect" : "Select"}
             size={18}
+            onClick={(e) => e.stopPropagation()}
           />
           <span
             className="select-none cursor-grab text-slate-400 dark:text-slate-500"
             title="Drag to move"
+            onClick={(e) => e.stopPropagation()}
           >
             ⋮⋮
           </span>
@@ -155,14 +159,15 @@ export default function CaseRow({
             onSave={() => onSaveEdit()}
             onCancel={onCancelEdit}
             fontSize="text-[15px]"
-            onViewClick={() => onOpen()}
+            onViewClick={() => onStartEdit()}
             viewClassName="hover:underline"
+            onClick={(e) => e.stopPropagation()}
           />
         </div>
 
         {/* BADGES */}
         {cols.priority && (
-          <div className="flex items-center">
+          <div className="flex items-center" onClick={(e) => e.stopPropagation()}>
             <CasePriorityBadge
               ref={priRef}
               onClick={() => setOpenPri((v) => !v)}
@@ -198,7 +203,7 @@ export default function CaseRow({
         )}
 
         {cols.type && (
-          <div className="flex items-center">
+          <div className="flex items-center" onClick={(e) => e.stopPropagation()}>
             <CaseTypeBadge
               ref={typeRef}
               onClick={() => setOpenType((v) => !v)}
@@ -236,7 +241,7 @@ export default function CaseRow({
         )}
 
         {cols.automation && (
-          <div className="flex items-center">
+          <div className="flex items-center" onClick={(e) => e.stopPropagation()}>
             <CaseAutomationBadge
               ref={autoRef}
               onClick={() => setOpenAuto((v) => !v)}
@@ -284,9 +289,10 @@ export default function CaseRow({
         )}
 
         {/* ACTIONS */}
-        <TableRowActions
-          className="[&>button]:rounded-full"
-          actions={[
+        <div onClick={(e) => e.stopPropagation()}>
+          <TableRowActions
+            className="[&>button]:rounded-full"
+            actions={[
             {
               key: "open",
               title: "Open",
@@ -309,7 +315,8 @@ export default function CaseRow({
               onClick: onDelete,
             },
           ]}
-        />
+          />
+        </div>
       </div>
     </li>
   );

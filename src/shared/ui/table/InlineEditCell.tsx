@@ -12,6 +12,7 @@ interface Props {
   fontSize?: string;
   onViewClick?: (id: number) => void;
   viewClassName?: string;
+  onClick?: (e: React.MouseEvent) => void;
 }
 
 export default function InlineEditCell({
@@ -26,6 +27,7 @@ export default function InlineEditCell({
   fontSize = "text-[15px]",
   onViewClick,
   viewClassName = "",
+  onClick,
 }: Props) {
   const inputRef = useRef<HTMLInputElement>(null);
 
@@ -44,7 +46,10 @@ export default function InlineEditCell({
           type="button"
           className={`${baseClasses} text-left focus:outline-none hover:underline ${viewClassName}`}
           title={value}
-          onClick={() => onViewClick(id)}
+          onClick={(e) => {
+            if (onClick) onClick(e);
+            onViewClick(id);
+          }}
         >
           {value}
         </button>
