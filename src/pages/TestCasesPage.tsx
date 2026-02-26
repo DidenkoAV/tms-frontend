@@ -1,6 +1,6 @@
 // src/pages/TestCasesPage.tsx
 import { useEffect, useMemo, useState } from "react";
-import { useNavigate, useParams } from "react-router-dom";
+import { useNavigate, useParams, useLocation } from "react-router-dom";
 import { http } from "@/lib/http";
 
 // Entities (new structure)
@@ -15,17 +15,19 @@ import { updateSuite as apiUpdateSuite, batchDeleteSuites } from "@/entities/tes
 import { useConfirm, AlertBanner } from "@/shared/ui/alert";
 import { FolderIcon } from "@/shared/ui/icons";
 import { TestCasesHeader, CaseSuiteCard, ImportExportPanel, type CaseRowsListProps, CreateSuiteModal, type Suite } from "@/features/test-cases";
+import { JiraBatchProvider, useJiraBatch } from "@/features/integrations/jira/ui/JiraBatchContext";
 
 /* Dynamic grid template based on visible columns */
 function buildGridTemplate(cols: Record<ColKey, boolean>): string {
-  const parts: string[] = ["minmax(0,1fr)"]; // Title column - always visible, takes remaining space
+  const parts: string[] = ["minmax(180px,1fr)"]; // Title column - min 180px
 
-  if (cols.priority) parts.push("110px");
-  if (cols.type) parts.push("140px");
-  if (cols.automation) parts.push("140px");
-  if (cols.author) parts.push("220px");
+  if (cols.priority) parts.push("100px");
+  if (cols.type) parts.push("120px");
+  if (cols.automation) parts.push("110px");
+  if (cols.author) parts.push("120px"); // Compact: only name, no email/avatar
+  if (cols.jira) parts.push("140px");
 
-  parts.push("128px"); // Actions column - always visible
+  parts.push("96px"); // Actions column - compact buttons
 
   // Return CSS value for gridTemplateColumns, not className
   return parts.join(" ");
@@ -38,18 +40,22 @@ const CASE_SORT_DIR_KEY = "cases.caseSortDir";
 const CASE_SORT_PER_SUITE_KEY = "cases.caseSortPerSuite";
 
 /* columns config */
-type ColKey = "priority" | "type" | "automation" | "author";
+type ColKey = "priority" | "type" | "automation" | "author" | "jira";
 const DEFAULT_COLS: Record<ColKey, boolean> = {
   priority: true,
   type: true,
   automation: true,
   author: true,
+  jira: true, // Enabled by default - uses batch loading for performance
 };
 
-export default function TestCasesPage() {
+// Inner component that uses JiraBatch context
+function TestCasesPageContent() {
   const { id } = useParams();
   const nav = useNavigate();
+  const location = useLocation();
   const projectId = Number(id ?? NaN);
+  const jiraBatch = useJiraBatch();
 
   const confirm = useConfirm();
   const [banner, setBanner] = useState<{
@@ -67,16 +73,28 @@ export default function TestCasesPage() {
   const [loading, setLoading] = useState(true);
   const [err, setErr] = useState<string | null>(null);
 
+  // Counter to force remount of CaseRow components when data is reloaded
+  // This ensures JiraIssuesInline reloads fresh data
+  const [dataVersion, setDataVersion] = useState(0);
+
   const [openSuites, setOpenSuites] = useState<Record<string, boolean>>({
     project: false,
   });
 
   const [cols, setCols] = useState<Record<ColKey, boolean>>(() => {
     try {
-      return {
+      const saved = JSON.parse(localStorage.getItem(COLS_KEY) || "{}");
+      // Ensure all default columns exist (migration for new columns like 'jira')
+      // If 'jira' is missing, add it with default value
+      const merged = {
         ...DEFAULT_COLS,
-        ...JSON.parse(localStorage.getItem(COLS_KEY) || "{}"),
+        ...saved,
       };
+      // If jira was not in saved config, ensure it's set to default
+      if (!('jira' in saved)) {
+        merged.jira = DEFAULT_COLS.jira;
+      }
+      return merged;
     } catch {
       return DEFAULT_COLS;
     }
@@ -162,6 +180,16 @@ export default function TestCasesPage() {
         for (const s of suitesRes.data) if (!(s.id in m)) m[s.id] = true;
         return m;
       });
+
+      // Load Jira issues for all cases in batch (if Jira column is visible)
+      if (cols.jira && casesRes.data.length > 0) {
+        const caseIds = casesRes.data.map(c => c.id);
+        await jiraBatch.loadBatch(projectId, caseIds);
+      }
+
+      // Increment version to force remount of CaseRow components
+      // This ensures JiraIssuesInline reloads fresh data
+      setDataVersion(v => v + 1);
     } catch (e: any) {
       setErr(e?.response?.data?.message || "Failed to load project");
     } finally {
@@ -173,6 +201,13 @@ export default function TestCasesPage() {
     if (!Number.isFinite(projectId) || projectId <= 0) return;
     loadData();
   }, [projectId]);
+
+  // Reload data when returning to this page (e.g., after navigating back from case details)
+  // location.key changes on every navigation, so we reload data
+  useEffect(() => {
+    if (!Number.isFinite(projectId) || projectId <= 0) return;
+    loadData();
+  }, [location.key]);
 
   /* ========== SORTING, GROUPING ========== */
   const suitesSorted = useMemo(() => {
@@ -496,6 +531,8 @@ export default function TestCasesPage() {
     editingCaseId,
     draftCaseTitle,
     setDraftCaseTitle,
+    projectId,
+    dataVersion,
   };
 
   if (!Number.isFinite(projectId) || projectId <= 0) return null;
@@ -670,5 +707,14 @@ export default function TestCasesPage() {
 
       {confirm.ui}
     </div>
+  );
+}
+
+// Wrapper component with JiraBatchProvider
+export default function TestCasesPage() {
+  return (
+    <JiraBatchProvider>
+      <TestCasesPageContent />
+    </JiraBatchProvider>
   );
 }

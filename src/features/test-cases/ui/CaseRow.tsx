@@ -15,11 +15,12 @@ import {
   type CasePriorityLabel,
   type CaseTypeLabel,
 } from "@/shared/ui/table/CaseBadges";
+import { JiraIssuesInline } from "@/features/integrations/jira";
 
 /* mapping + helpers */
 export type CaseRowProps = {
   c: TestCase;
-  cols: Record<"priority" | "type" | "automation" | "author", boolean>;
+  cols: Record<"priority" | "type" | "automation" | "author" | "jira", boolean>;
   gridCols: string;
 
   onOpen: () => void;
@@ -41,6 +42,7 @@ export type CaseRowProps = {
 
   checked: boolean;
   onCheck: (v: boolean) => void;
+  projectId: number;
 };
 
 function AuthorCell({
@@ -52,32 +54,15 @@ function AuthorCell({
   email?: string | null;
   userId?: number | null;
 }) {
+  // Compact display: only name (no email, no avatar)
   const display =
     (name && name.trim()) ||
-    (email && email.trim()) ||
-    (userId ? `#${userId}` : "—");
-  const initials =
-    (name || email || (userId ? String(userId) : "U"))
-      .split(/[\s.@_]+/)
-      .filter(Boolean)
-      .slice(0, 2)
-      .map((s) => s[0]?.toUpperCase())
-      .join("") || "U";
+    (email && email.split('@')[0]?.trim()) ||
+    (userId ? `User #${userId}` : "—");
+
   return (
-    <div className="flex items-center gap-2">
-      <div className="grid h-7 w-7 place-items-center rounded-full bg-slate-200 text-[11px] font-semibold text-slate-700 dark:bg-slate-700 dark:text-slate-100">
-        {initials}
-      </div>
-      <div className="min-w-0">
-        <div className="truncate text-[13px] font-medium text-slate-800 dark:text-slate-100">
-          {display}
-        </div>
-        {email && (
-          <div className="truncate text-[11px] text-slate-500 dark:text-slate-400">
-            {email}
-          </div>
-        )}
-      </div>
+    <div className="truncate text-[13px] text-slate-700 dark:text-slate-300">
+      {display}
     </div>
   );
 }
@@ -97,6 +82,7 @@ export default function CaseRow({
   gridCols,
   checked,
   onCheck,
+  projectId,
 }: CaseRowProps) {
   const priority: CasePriorityLabel = priorityLabelFromId(c.priorityId);
   const type: CaseTypeLabel = typeLabelFromId(c.typeId);
@@ -288,6 +274,13 @@ export default function CaseRow({
           </div>
         )}
 
+        {/* JIRA */}
+        {cols.jira && (
+          <div className="flex items-center">
+            <JiraIssuesInline testCaseId={c.id} />
+          </div>
+        )}
+
         {/* ACTIONS */}
         <div onClick={(e) => e.stopPropagation()}>
           <TableRowActions
@@ -297,12 +290,14 @@ export default function CaseRow({
               key: "open",
               title: "Open",
               variant: "ghost",
+              size: "sm",
               icon: <OpenIcon />,
               onClick: onOpen,
             },
             {
               key: "rename",
               title: "Rename",
+              size: "sm",
               icon: <EditIcon />,
               hidden: isEditing,
               onClick: onStartEdit,
@@ -311,6 +306,7 @@ export default function CaseRow({
               key: "delete",
               title: "Delete",
               variant: "danger",
+              size: "sm",
               icon: <TrashIcon />,
               onClick: onDelete,
             },

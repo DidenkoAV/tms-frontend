@@ -1,15 +1,14 @@
 // src/features/jira/components/JiraIssuesInline.tsx
 import { ExternalLinkIcon } from "lucide-react";
-import { useJiraIssues } from "@/features/integrations/jira/ui/hooks/useJiraIssues";
+import { useJiraBatch } from "@/features/integrations/jira/ui/JiraBatchContext";
 
 interface Props {
-  groupId: number;
   testCaseId: number;
 }
 
-export default function JiraIssuesInline({ groupId, testCaseId }: Props) {
-  // Soft mode: show all tickets, even without summary/status
-  const { issues, loading, error } = useJiraIssues(groupId, testCaseId);
+export default function JiraIssuesInline({ testCaseId }: Props) {
+  const { getIssues, loading, error } = useJiraBatch();
+  const issues = getIssues(testCaseId);
 
   if (loading) {
     return <span className="text-xs text-slate-400">Loading…</span>;
@@ -23,7 +22,7 @@ export default function JiraIssuesInline({ groupId, testCaseId }: Props) {
     return <span className="text-xs text-rose-500">Failed to load</span>;
   }
 
-  if (issues.length === 0) {
+  if (!issues || issues.length === 0) {
     return <span className="text-xs text-slate-400">—</span>;
   }
 

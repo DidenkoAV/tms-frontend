@@ -352,7 +352,7 @@ export default function RunTable(props: Props) {
                   </td>
 
                   {/* Author */}
-                  <td className={`${padX} ${padY} w-[240px]`}>
+                  <td className={`${padX} ${padY} w-[120px]`}>
                     {cols.author && (
                       <AuthorCell
                         name={r.createdByName}

@@ -383,7 +383,7 @@ export default function RunTable({
               )}
 
               {cols.author && (
-                <th className="w-48 px-3 py-3">
+                <th className="w-32 px-3 py-3">
                   <span className={headLabel}>Author</span>
                 </th>
               )}

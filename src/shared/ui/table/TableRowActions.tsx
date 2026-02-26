@@ -19,7 +19,7 @@ interface TableRowActionsProps extends React.HTMLAttributes<HTMLDivElement> {
 }
 
 const BASE_CLASS =
-  "flex items-center justify-end gap-1.5 dark:[&>button]:text-slate-300 dark:[&>button:hover]:text-white";
+  "flex items-center justify-end gap-1 dark:[&>button]:text-slate-300 dark:[&>button:hover]:text-white";
 
 export default function TableRowActions({
   actions,

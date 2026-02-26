@@ -199,11 +199,8 @@ export default function JiraIssuesBlock({
       setError(null);
       setLoading(true);
       const data = await listJiraIssues(groupId, testCaseId);
-      const filtered = (data || []).filter(
-        (x: JiraIssue) =>
-          x && x.issueKey && x.summary && x.summary !== "(unavailable)" && x.status && x.status !== "UNKNOWN"
-      );
-      setIssues(filtered);
+      // Show all issues, even with null summary/description (same as JiraIssuesInline)
+      setIssues(data || []);
     } catch (e: any) {
       if (e?.response?.status === 404) setError("no-connection");
       else setError("failed");

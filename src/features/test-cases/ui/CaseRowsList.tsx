@@ -1,7 +1,7 @@
 import type { TestCase } from "@/entities/test-case";
 import { CaseRow, type CaseRowProps } from "@/features/test-cases";
 
-type ColKey = "priority" | "type" | "automation" | "author";
+type ColKey = "priority" | "type" | "automation" | "author" | "jira";
 
 export type CaseRowsListProps = {
   cases: TestCase[];
@@ -18,6 +18,8 @@ export type CaseRowsListProps = {
   editingCaseId: number | null;
   draftCaseTitle: string;
   setDraftCaseTitle: (s: string) => void;
+  projectId: number;
+  dataVersion: number; // Used to force remount when data is reloaded
 };
 
 export default function CaseRowsList({
@@ -35,12 +37,14 @@ export default function CaseRowsList({
   editingCaseId,
   draftCaseTitle,
   setDraftCaseTitle,
+  projectId,
+  dataVersion,
 }: CaseRowsListProps) {
   return (
     <>
       {cases.map((testCase) => (
         <CaseRow
-          key={testCase.id}
+          key={`${testCase.id}-${dataVersion}`}
           c={testCase}
           cols={cols}
           onOpen={() => onOpenCase(testCase.id)}
@@ -55,6 +59,7 @@ export default function CaseRowsList({
           isEditing={editingCaseId === testCase.id}
           draftCaseTitle={draftCaseTitle}
           setDraftCaseTitle={setDraftCaseTitle}
+          projectId={projectId}
         />
       ))}
     </>

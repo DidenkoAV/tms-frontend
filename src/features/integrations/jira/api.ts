@@ -81,6 +81,14 @@ export async function listJiraIssues(
   return data;
 }
 
+export async function batchListJiraIssues(
+  groupId: number,
+  testCaseIds: number[]
+): Promise<Record<number, JiraIssue[]>> {
+  const { data } = await http.post(`/api/integrations/jira/issues/batch/${groupId}`, testCaseIds);
+  return data;
+}
+
 export async function listJiraIssueTypes(groupId: number): Promise<string[]> {
   const { data } = await http.get(`/api/integrations/jira/issue-types/${groupId}`);
   return data;
