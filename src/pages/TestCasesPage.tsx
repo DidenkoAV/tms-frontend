@@ -455,6 +455,10 @@ export default function TestCasesPage() {
     const parts = [sTxt, cTxt].filter(Boolean).join(" and ");
 
     confirm.open(`Delete ${parts}? This cannot be undone.`, async () => {
+      // Clear selections immediately to hide the delete button
+      setSelectedSuites(new Set());
+      setSelectedCases(new Set());
+
       // Delete suites using batch API
       if (suiteIds.length > 0) {
         try {
@@ -476,9 +480,6 @@ export default function TestCasesPage() {
           alertMsg(e?.response?.data?.message || `Failed to delete case #${cid}`);
         }
       }
-
-      setSelectedSuites(new Set());
-      setSelectedCases(new Set());
     });
   };
 
