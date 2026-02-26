@@ -176,19 +176,12 @@ export default function TestCasesPage() {
 
   /* ========== SORTING, GROUPING ========== */
   const suitesSorted = useMemo(() => {
+    // No automatic sorting - keep server order
+    // Only sort by depth to ensure parent suites come before children
     const arr = [...suites];
-    arr.sort((a, b) => {
-      // First sort by depth (root suites first)
-      if (a.depth !== b.depth) return a.depth - b.depth;
-      // Then by name
-      const an = a.name.toLowerCase();
-      const bn = b.name.toLowerCase();
-      if (an < bn) return suiteSortDir === "asc" ? -1 : 1;
-      if (an > bn) return suiteSortDir === "asc" ? 1 : -1;
-      return 0;
-    });
+    arr.sort((a, b) => a.depth - b.depth);
     return arr;
-  }, [suites, suiteSortDir]);
+  }, [suites]);
 
   const grouped = useMemo(() => {
     const s = q.trim().toLowerCase();
@@ -200,19 +193,10 @@ export default function TestCasesPage() {
       if (arr) arr.push(c);
       else map.set(key, [c]);
     }
-    for (const [k, list] of map) {
-      const dir = caseSortPerSuite[k] || defaultCaseSortDir;
-      list.sort((a, b) => {
-        const an = (a.title || "").toLowerCase();
-        const bn = (b.title || "").toLowerCase();
-        if (an < bn) return dir === "asc" ? -1 : 1;
-        if (an > bn) return dir === "asc" ? 1 : -1;
-        return 0;
-      });
-    }
+    // No automatic sorting - keep server order
     if (!map.has("project")) map.set("project", []);
     return map;
-  }, [cases, caseSortPerSuite, defaultCaseSortDir, q]);
+  }, [cases, q]);
 
   // Build suite hierarchy: only root suites (depth 0 or no parent)
   const rootSuites = useMemo(() => {
