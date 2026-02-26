@@ -36,6 +36,12 @@ interface Props {
   attachments?: File[];
   onChangeAttachments?: (files: File[]) => void;
 
+  // Author and Assigned fields (read-only display)
+  authorName?: string | null;
+  authorEmail?: string | null;
+  assignedToName?: string | null;
+  assignedToEmail?: string | null;
+
   className?: string;
 }
 
@@ -88,6 +94,10 @@ export default function CaseMeta({
   onChangeTestData,
   attachments,
   onChangeAttachments,
+  authorName,
+  authorEmail,
+  assignedToName,
+  assignedToEmail,
   className,
 }: Props) {
   const mergedStatusOptions = statusOptions ?? DEFAULT_STATUS_OPTIONS;
@@ -155,6 +165,30 @@ export default function CaseMeta({
           </label>
           <TagChips tags={tags} editable onChange={onChangeTags} size="sm" />
         </div>
+
+        {/* Author (read-only) */}
+        {(authorName || authorEmail) && (
+          <div>
+            <label className="block mb-1 text-xs text-slate-500 dark:text-slate-400">
+              Author
+            </label>
+            <div className="text-sm text-slate-700 dark:text-slate-300">
+              {authorName || authorEmail?.split('@')[0] || "—"}
+            </div>
+          </div>
+        )}
+
+        {/* Assigned (read-only) */}
+        {(assignedToName || assignedToEmail) && (
+          <div>
+            <label className="block mb-1 text-xs text-slate-500 dark:text-slate-400">
+              Assigned
+            </label>
+            <div className="text-sm text-slate-700 dark:text-slate-300">
+              {assignedToName || assignedToEmail?.split('@')[0] || "—"}
+            </div>
+          </div>
+        )}
 
         {showSuite && suiteName ? (
           <div className="pt-1 text-sm">

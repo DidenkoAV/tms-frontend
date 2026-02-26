@@ -1,7 +1,8 @@
 import type { TestCase } from "@/entities/test-case";
 import { CaseRow, type CaseRowProps } from "@/features/test-cases";
+import type { AssigneeOption } from "./AssigneeSelect";
 
-type ColKey = "priority" | "type" | "automation" | "author" | "jira";
+type ColKey = "priority" | "type" | "automation" | "author" | "assigned" | "jira";
 
 export type CaseRowsListProps = {
   cases: TestCase[];
@@ -20,6 +21,7 @@ export type CaseRowsListProps = {
   setDraftCaseTitle: (s: string) => void;
   projectId: number;
   dataVersion: number; // Used to force remount when data is reloaded
+  groupMembers: AssigneeOption[];
 };
 
 export default function CaseRowsList({
@@ -39,6 +41,7 @@ export default function CaseRowsList({
   setDraftCaseTitle,
   projectId,
   dataVersion,
+  groupMembers,
 }: CaseRowsListProps) {
   return (
     <>
@@ -60,6 +63,8 @@ export default function CaseRowsList({
           draftCaseTitle={draftCaseTitle}
           setDraftCaseTitle={setDraftCaseTitle}
           projectId={projectId}
+          dataVersion={dataVersion}
+          groupMembers={groupMembers}
         />
       ))}
     </>

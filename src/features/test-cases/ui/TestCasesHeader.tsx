@@ -2,7 +2,7 @@ import { useMemo, type ReactNode } from "react";
 import SearchInput from "@/shared/ui/search/SearchInput";
 import TableHeaderActions from "@/shared/ui/table/TableHeaderActions";
 
-type ColKey = "priority" | "type" | "automation" | "author" | "jira";
+type ColKey = "priority" | "type" | "automation" | "author" | "assigned" | "jira";
 
 interface Props {
   q: string;
@@ -48,6 +48,7 @@ export default function TestCasesHeader({
       { key: "type", label: "Type" },
       { key: "automation", label: "Automation" },
       { key: "author", label: "Author" },
+      { key: "assigned", label: "Assigned" },
       { key: "jira", label: "Jira" },
     ],
     []

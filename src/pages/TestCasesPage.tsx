@@ -12,22 +12,26 @@ import {
   deleteCase as apiDeleteCase,
 } from "@/entities/test-case";
 import { updateSuite as apiUpdateSuite, batchDeleteSuites } from "@/entities/test-suite";
+import { getGroupMembers } from "@/entities/group";
+import type { GroupMemberSimple } from "@/entities/group";
 import { useConfirm, AlertBanner } from "@/shared/ui/alert";
 import { FolderIcon } from "@/shared/ui/icons";
 import { TestCasesHeader, CaseSuiteCard, ImportExportPanel, type CaseRowsListProps, CreateSuiteModal, type Suite } from "@/features/test-cases";
 import { JiraBatchProvider, useJiraBatch } from "@/features/integrations/jira/ui/JiraBatchContext";
+import { useMe } from "@/features/account";
 
 /* Dynamic grid template based on visible columns */
 function buildGridTemplate(cols: Record<ColKey, boolean>): string {
-  const parts: string[] = ["minmax(180px,1fr)"]; // Title column - min 180px
+  const parts: string[] = ["minmax(200px,1fr)"]; // Title column - more space for full names
 
-  if (cols.priority) parts.push("100px");
-  if (cols.type) parts.push("120px");
-  if (cols.automation) parts.push("110px");
-  if (cols.author) parts.push("120px"); // Compact: only name, no email/avatar
-  if (cols.jira) parts.push("140px");
+  if (cols.priority) parts.push("90px");   // Compact: 100 → 90
+  if (cols.type) parts.push("100px");      // Compact: 120 → 100
+  if (cols.automation) parts.push("90px"); // Compact: 110 → 90
+  if (cols.author) parts.push("110px");    // Compact: 120 → 110
+  if (cols.assigned) parts.push("140px");  // Wider for dropdown: 120 → 140
+  if (cols.jira) parts.push("160px");      // Wider for multiple tickets + actions: 140 → 160
 
-  parts.push("96px"); // Actions column - compact buttons
+  parts.push("80px"); // Actions column - more compact: 96 → 80
 
   // Return CSS value for gridTemplateColumns, not className
   return parts.join(" ");
@@ -40,12 +44,13 @@ const CASE_SORT_DIR_KEY = "cases.caseSortDir";
 const CASE_SORT_PER_SUITE_KEY = "cases.caseSortPerSuite";
 
 /* columns config */
-type ColKey = "priority" | "type" | "automation" | "author" | "jira";
+type ColKey = "priority" | "type" | "automation" | "author" | "assigned" | "jira";
 const DEFAULT_COLS: Record<ColKey, boolean> = {
   priority: true,
   type: true,
   automation: true,
   author: true,
+  assigned: true, // Assigned to
   jira: true, // Enabled by default - uses batch loading for performance
 };
 
@@ -67,9 +72,13 @@ function TestCasesPageContent() {
     setTimeout(() => setBanner(null), 2600);
   }
 
+  const { me } = useMe();
+  const groupId = me?.currentGroupId ?? me?.groups?.[0]?.id ?? null;
+
   const [project, setProject] = useState<Project | null>(null);
   const [suites, setSuites] = useState<Suite[]>([]);
   const [cases, setCases] = useState<TestCase[]>([]);
+  const [groupMembers, setGroupMembers] = useState<GroupMemberSimple[]>([]);
   const [loading, setLoading] = useState(true);
   const [err, setErr] = useState<string | null>(null);
 
@@ -173,6 +182,18 @@ function TestCasesPageContent() {
 
       setSuites(suitesRes.data);
       setCases(casesRes.data);
+
+      // Load group members for assignee dropdown
+      if (groupId) {
+        try {
+          const members = await getGroupMembers(groupId);
+          // Filter only ACTIVE members
+          setGroupMembers(members.filter(m => m.status === "ACTIVE"));
+        } catch (e) {
+          console.warn("Failed to load group members:", e);
+          setGroupMembers([]);
+        }
+      }
 
       // expand new suites
       setOpenSuites((prev) => {
@@ -342,14 +363,16 @@ function TestCasesPageContent() {
   const patchCase = async (
     id: number,
     patch: Partial<
-      Pick<TestCase, "priorityId" | "typeId" | "automationStatus" | "title">
+      Pick<TestCase, "priorityId" | "typeId" | "automationStatus" | "title" | "assignedTo">
     >
   ) => {
     const prev = cases.find((x) => x.id === id);
     if (!prev) return;
     setCases((list) => list.map((x) => (x.id === id ? { ...x, ...patch } : x)));
     try {
-      await apiUpdateCase(id, patch as any);
+      const updated = await apiUpdateCase(id, patch as any);
+      // Update with full response to get assignedToName and assignedToEmail
+      setCases((list) => list.map((x) => (x.id === id ? { ...x, ...updated } : x)));
     } catch (e: any) {
       setCases((list) => list.map((x) => (x.id === id ? prev : x)));
       alertMsg(e?.response?.data?.message || "Failed to update case");
@@ -533,6 +556,11 @@ function TestCasesPageContent() {
     setDraftCaseTitle,
     projectId,
     dataVersion,
+    groupMembers: groupMembers.map(m => ({
+      userId: m.userId,
+      name: m.userName,
+      email: m.userEmail,
+    })),
   };
 
   if (!Number.isFinite(projectId) || projectId <= 0) return null;

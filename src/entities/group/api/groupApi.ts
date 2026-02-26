@@ -4,6 +4,7 @@ import type {
   GroupDetails,
   GroupRole,
   JiraConnectionDto,
+  GroupMemberSimple,
 } from "../model/types";
 
 /* ---------- Password ---------- */
@@ -34,6 +35,11 @@ export async function listMyGroups(): Promise<GroupDetails[]> {
 
 export async function getGroup(groupId: number): Promise<GroupDetails> {
   const { data } = await http.get(`/api/groups/${groupId}`);
+  return data;
+}
+
+export async function getGroupMembers(groupId: number): Promise<GroupMemberSimple[]> {
+  const { data } = await http.get(`/api/groups/${groupId}/members`);
   return data;
 }
 

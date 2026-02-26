@@ -97,6 +97,10 @@ export type TestCase = {
   createdBy?: number | null;
   createdByName?: string | null;
   createdByEmail?: string | null;
+
+  assignedTo?: number | null;
+  assignedToName?: string | null;
+  assignedToEmail?: string | null;
 };
 
 /**
@@ -121,6 +125,7 @@ export type TestCaseUpdate = Partial<
     | "tags"
     | "suiteId"
     | "autotestMapping"
+    | "assignedTo"
   >
 >;
 

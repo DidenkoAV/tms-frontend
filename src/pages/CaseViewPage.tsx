@@ -580,6 +580,10 @@ export default function CaseViewPage() {
                   onChangeAutomation={setDraftAutomation}
                   onChangeEstimate={setDraftEstimate}
                   onChangeTags={setDraftTags}
+                  authorName={item.createdByName}
+                  authorEmail={item.createdByEmail}
+                  assignedToName={item.assignedToName}
+                  assignedToEmail={item.assignedToEmail}
                 />
 
                 <CaseTestData

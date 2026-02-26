@@ -48,6 +48,17 @@ export interface GroupMember {
   createdAt: string; // ISO
 }
 
+export interface GroupMemberSimple {
+  id: number; // membership id
+  userId: number;
+  userName: string;
+  userEmail: string;
+  role: GroupRole;
+  status: MembershipStatus;
+  joinedAt: string | null;
+  invitedBy: string | null;
+}
+
 export interface GroupDetails extends GroupSummary {
   members: GroupMember[]; // Always normalized to [] in component
 }

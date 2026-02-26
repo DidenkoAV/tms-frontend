@@ -4,6 +4,9 @@ import { TFCheckbox, TableRowActions } from "@/shared/ui/table";
 import { FileIcon, EditIcon, TrashIcon, OpenIcon } from "@/shared/ui/icons";
 import DropdownPortal, { MenuItem } from "./DropdownPortal";
 import InlineEditCell from "@/shared/ui/table/InlineEditCell";
+import AuthorCell from "@/shared/ui/table/AuthorCell";
+import AssigneeSelect, { type AssigneeOption } from "./AssigneeSelect";
+import { JiraIssuesInline } from "@/features/integrations/jira";
 import {
   CaseAutomationBadge,
   CasePriorityBadge,
@@ -15,12 +18,11 @@ import {
   type CasePriorityLabel,
   type CaseTypeLabel,
 } from "@/shared/ui/table/CaseBadges";
-import { JiraIssuesInline } from "@/features/integrations/jira";
 
 /* mapping + helpers */
 export type CaseRowProps = {
   c: TestCase;
-  cols: Record<"priority" | "type" | "automation" | "author" | "jira", boolean>;
+  cols: Record<"priority" | "type" | "automation" | "author" | "assigned" | "jira", boolean>;
   gridCols: string;
 
   onOpen: () => void;
@@ -36,36 +38,16 @@ export type CaseRowProps = {
   onPatchCase: (
     id: number,
     patch: Partial<
-      Pick<TestCase, "priorityId" | "typeId" | "automationStatus" | "title">
+      Pick<TestCase, "priorityId" | "typeId" | "automationStatus" | "title" | "assignedTo">
     >
   ) => void | Promise<void>;
 
   checked: boolean;
   onCheck: (v: boolean) => void;
   projectId: number;
+  dataVersion?: number;
+  groupMembers: AssigneeOption[];
 };
-
-function AuthorCell({
-  name,
-  email,
-  userId,
-}: {
-  name?: string | null;
-  email?: string | null;
-  userId?: number | null;
-}) {
-  // Compact display: only name (no email, no avatar)
-  const display =
-    (name && name.trim()) ||
-    (email && email.split('@')[0]?.trim()) ||
-    (userId ? `User #${userId}` : "—");
-
-  return (
-    <div className="truncate text-[13px] text-slate-700 dark:text-slate-300">
-      {display}
-    </div>
-  );
-}
 
 export default function CaseRow({
   c,
@@ -83,6 +65,8 @@ export default function CaseRow({
   checked,
   onCheck,
   projectId,
+  dataVersion,
+  groupMembers,
 }: CaseRowProps) {
   const priority: CasePriorityLabel = priorityLabelFromId(c.priorityId);
   const type: CaseTypeLabel = typeLabelFromId(c.typeId);
@@ -270,6 +254,17 @@ export default function CaseRow({
               name={c.createdByName || null}
               email={c.createdByEmail || null}
               userId={c.createdBy ?? undefined}
+            />
+          </div>
+        )}
+
+        {/* ASSIGNED */}
+        {cols.assigned && (
+          <div className="flex items-center" onClick={(e) => e.stopPropagation()}>
+            <AssigneeSelect
+              value={c.assignedTo ?? null}
+              onChange={(userId) => onPatchCase(c.id, { assignedTo: userId })}
+              options={groupMembers}
             />
           </div>
         )}

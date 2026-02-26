@@ -3,7 +3,7 @@ import { SuiteCard } from "@/features/test-cases";
 import CaseRowsList, { type CaseRowsListProps } from "./CaseRowsList";
 import type { TestCase } from "@/entities/test-case";
 
-type ColKey = "priority" | "type" | "automation" | "author";
+type ColKey = "priority" | "type" | "automation" | "author" | "assigned" | "jira";
 
 type RenameControls = {
   showRename: boolean;

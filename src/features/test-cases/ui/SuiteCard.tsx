@@ -31,7 +31,7 @@ export type SuiteCardProps = {
   onDragOver: (e: React.DragEvent) => void;
   onDrop: (e: React.DragEvent) => void;
 
-  cols: Record<"priority"|"type"|"automation"|"author"|"jira", boolean>;
+  cols: Record<"priority"|"type"|"automation"|"author"|"assigned"|"jira", boolean>;
   itemsCount: number;
   hasChildSuites?: boolean;
 
@@ -161,6 +161,7 @@ export default function SuiteCard(props: SuiteCardProps) {
                 {cols.type      && <div className="text-[11px] uppercase tracking-wide text-slate-500 dark:text-slate-400">Type</div>}
                 {cols.automation&& <div className="text-[11px] uppercase tracking-wide text-slate-500 dark:text-slate-400">Automation</div>}
                 {cols.author    && <div className="text-[11px] uppercase tracking-wide text-slate-500 dark:text-slate-400">Author</div>}
+                {cols.assigned  && <div className="text-[11px] uppercase tracking-wide text-slate-500 dark:text-slate-400">Assigned</div>}
                 {cols.jira      && <div className="text-[11px] uppercase tracking-wide text-slate-500 dark:text-slate-400">Jira</div>}
                 <div />
               </div>
