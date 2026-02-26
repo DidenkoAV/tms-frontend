@@ -27,3 +27,11 @@ export async function updateSuite(id: number, payload: SuiteUpdateRequest): Prom
 export async function archiveSuite(id: number): Promise<void> {
   await http.delete(`/api/suites/${id}`);
 }
+
+/** POST /api/suites/batch-delete - Delete multiple suites (with cascading) */
+export async function batchDeleteSuites(suiteIds: number[]): Promise<{ deletedCount: number }> {
+  const { data } = await http.post<{ deletedCount: number }>(`/api/suites/batch-delete`, {
+    suiteIds,
+  });
+  return data;
+}

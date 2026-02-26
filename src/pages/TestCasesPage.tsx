@@ -11,14 +11,25 @@ import {
   updateCase as apiUpdateCase,
   deleteCase as apiDeleteCase,
 } from "@/entities/test-case";
-import { updateSuite as apiUpdateSuite } from "@/entities/test-suite";
+import { updateSuite as apiUpdateSuite, batchDeleteSuites } from "@/entities/test-suite";
 import { useConfirm, AlertBanner } from "@/shared/ui/alert";
 import { FolderIcon } from "@/shared/ui/icons";
 import { TestCasesHeader, CaseSuiteCard, ImportExportPanel, type CaseRowsListProps, CreateSuiteModal, type Suite } from "@/features/test-cases";
 
-/* fixed grid: [title] + Priority + Type + Automation + Author + [actions] */
-const GRID_TMPL =
-  "grid grid-cols-[minmax(0,1fr)_110px_140px_140px_220px_128px] gap-2";
+/* Dynamic grid template based on visible columns */
+function buildGridTemplate(cols: Record<ColKey, boolean>): string {
+  const parts: string[] = ["minmax(0,1fr)"]; // Title column - always visible, takes remaining space
+
+  if (cols.priority) parts.push("110px");
+  if (cols.type) parts.push("140px");
+  if (cols.automation) parts.push("140px");
+  if (cols.author) parts.push("220px");
+
+  parts.push("128px"); // Actions column - always visible
+
+  // Return CSS value for gridTemplateColumns, not className
+  return parts.join(" ");
+}
 
 /* localStorage keys */
 const COLS_KEY = "cases.columns";
@@ -114,6 +125,7 @@ export default function TestCasesPage() {
   const [draftCaseTitle, setDraftCaseTitle] = useState("");
 
   const [showSuiteModal, setShowSuiteModal] = useState(false);
+  const [parentSuiteForNew, setParentSuiteForNew] = useState<number | null>(null);
   const [q, setQ] = useState("");
   const [selectedSuites, setSelectedSuites] = useState<Set<number>>(new Set());
   const [selectedCases, setSelectedCases] = useState<Set<number>>(new Set());
@@ -166,6 +178,9 @@ export default function TestCasesPage() {
   const suitesSorted = useMemo(() => {
     const arr = [...suites];
     arr.sort((a, b) => {
+      // First sort by depth (root suites first)
+      if (a.depth !== b.depth) return a.depth - b.depth;
+      // Then by name
       const an = a.name.toLowerCase();
       const bn = b.name.toLowerCase();
       if (an < bn) return suiteSortDir === "asc" ? -1 : 1;
@@ -199,13 +214,23 @@ export default function TestCasesPage() {
     return map;
   }, [cases, caseSortPerSuite, defaultCaseSortDir, q]);
 
+  // Build suite hierarchy: only root suites (depth 0 or no parent)
+  const rootSuites = useMemo(() => {
+    return suitesSorted.filter(s => !s.parentId || s.depth === 0);
+  }, [suitesSorted]);
+
+  // Get children for a suite
+  const getChildSuites = (parentId: number): Suite[] => {
+    return suitesSorted.filter(s => s.parentId === parentId);
+  };
+
   const suitesToRender = useMemo(() => {
     const s = q.trim();
-    if (!s) return suitesSorted;
-    return suitesSorted.filter(
+    if (!s) return rootSuites;
+    return rootSuites.filter(
       (su) => (grouped.get(String(su.id))?.length || 0) > 0
     );
-  }, [suitesSorted, grouped, q]);
+  }, [rootSuites, grouped, q]);
 
   /* ========== CASE + SUITE OPERATIONS ========== */
   const goNewCase = (suiteId?: number) => {
@@ -334,18 +359,57 @@ export default function TestCasesPage() {
 
   /* ========== SELECTION + BULK ========== */
   const toggleSuiteCheckbox = (suiteKey: string, v: boolean) => {
-    const ids = grouped.get(suiteKey) ?? [];
-    setSelectedCases((prev) => {
-      const ns = new Set(prev);
-      ids.forEach((c) => (v ? ns.add(c.id) : ns.delete(c.id)));
-      return ns;
-    });
-    if (suiteKey !== "project") {
-      const sid = Number(suiteKey);
+    // Get all child suite IDs recursively
+    const getAllChildSuiteIds = (suiteId: number): number[] => {
+      const children = getChildSuites(suiteId);
+      const childIds = children.map(c => c.id);
+      const nestedIds = children.flatMap(c => getAllChildSuiteIds(c.id));
+      return [...childIds, ...nestedIds];
+    };
+
+    // Get all case IDs from suite and children recursively
+    const getAllCaseIds = (suiteId: number): number[] => {
+      const directCases = grouped.get(String(suiteId)) ?? [];
+      const directCaseIds = directCases.map(c => c.id);
+      const children = getChildSuites(suiteId);
+      const childCaseIds = children.flatMap(c => getAllCaseIds(c.id));
+      return [...directCaseIds, ...childCaseIds];
+    };
+
+    if (suiteKey === "project") {
+      // For project suite, just select direct cases
+      const ids = grouped.get(suiteKey) ?? [];
+      setSelectedCases((prev) => {
+        const ns = new Set(prev);
+        ids.forEach((c) => (v ? ns.add(c.id) : ns.delete(c.id)));
+        return ns;
+      });
+    } else {
+      const suiteId = Number(suiteKey);
+
+      // Get all cases (direct + nested)
+      const allCaseIds = getAllCaseIds(suiteId);
+
+      // Get all child suites
+      const allChildSuiteIds = getAllChildSuiteIds(suiteId);
+
+      // Update selected cases
+      setSelectedCases((prev) => {
+        const ns = new Set(prev);
+        allCaseIds.forEach((id) => (v ? ns.add(id) : ns.delete(id)));
+        return ns;
+      });
+
+      // Update selected suites
       setSelectedSuites((prev) => {
         const ns = new Set(prev);
-        if (v) ns.add(sid);
-        else ns.delete(sid);
+        if (v) {
+          ns.add(suiteId);
+          allChildSuiteIds.forEach(id => ns.add(id));
+        } else {
+          ns.delete(suiteId);
+          allChildSuiteIds.forEach(id => ns.delete(id));
+        }
         return ns;
       });
     }
@@ -358,6 +422,18 @@ export default function TestCasesPage() {
       else ns.delete(caseId);
       return ns;
     });
+  };
+
+  const selectAll = () => {
+    // Select all suites
+    setSelectedSuites(new Set(suites.map(s => s.id)));
+    // Select all cases
+    setSelectedCases(new Set(cases.map(c => c.id)));
+  };
+
+  const deselectAll = () => {
+    setSelectedSuites(new Set());
+    setSelectedCases(new Set());
   };
 
   const toggleSuiteOpen = (key: string) =>
@@ -379,14 +455,19 @@ export default function TestCasesPage() {
     const parts = [sTxt, cTxt].filter(Boolean).join(" and ");
 
     confirm.open(`Delete ${parts}? This cannot be undone.`, async () => {
-      for (const sid of suiteIds) {
+      // Delete suites using batch API
+      if (suiteIds.length > 0) {
         try {
-          await http.delete(`/api/suites/${sid}`);
-          setSuites((prev) => prev.filter((s) => s.id !== sid));
+          const result = await batchDeleteSuites(suiteIds);
+          alertMsg(`Deleted ${result.deletedCount} suite(s) (including nested suites)`, "info");
+          // Reload data to get updated suite list (cascading delete may have removed more)
+          await loadData();
         } catch (e: any) {
-          alertMsg(e?.response?.data?.message || `Failed to delete suite #${sid}`);
+          alertMsg(e?.response?.data?.message || "Failed to delete suites");
         }
       }
+
+      // Delete cases one by one
       for (const cid of caseIds) {
         try {
           await apiDeleteCase(cid);
@@ -395,6 +476,7 @@ export default function TestCasesPage() {
           alertMsg(e?.response?.data?.message || `Failed to delete case #${cid}`);
         }
       }
+
       setSelectedSuites(new Set());
       setSelectedCases(new Set());
     });
@@ -413,6 +495,9 @@ export default function TestCasesPage() {
   /* ========== RENDER ========== */
   const projectCases = grouped.get("project") ?? [];
   const projectSortDir = caseSortPerSuite["project"] || defaultCaseSortDir;
+
+  // Build dynamic grid template based on visible columns
+  const gridTemplate = buildGridTemplate(cols);
 
   const caseRowsProps: Omit<CaseRowsListProps, "cases" | "cols" | "gridTemplate"> = {
     selectedCases,
@@ -449,6 +534,10 @@ export default function TestCasesPage() {
         selectedSuites={selectedSuites}
         selectedCases={selectedCases}
         onBulkDelete={bulkDelete}
+        onSelectAll={selectAll}
+        onDeselectAll={deselectAll}
+        totalSuites={suites.length}
+        totalCases={cases.length}
         onNewSuite={() => setShowSuiteModal(true)}
         extraRight={
           <ImportExportPanel
@@ -466,7 +555,7 @@ export default function TestCasesPage() {
       )}
 
       {/* ======= Hierarchy ======= */}
-      <section className="space-y-4">
+      <section className="space-y-6">
         {!q.trim() && (
           <CaseSuiteCard
             suiteKey="project"
@@ -482,7 +571,7 @@ export default function TestCasesPage() {
             onDrop={dropTo("project")}
             cols={cols}
             cases={projectCases}
-            gridTemplate={GRID_TMPL}
+            gridTemplate={gridTemplate}
             suiteSelectable={false}
             suiteChecked={false}
             suiteIndeterminate={false}
@@ -493,49 +582,81 @@ export default function TestCasesPage() {
         )}
 
         {suitesToRender.map((suite) => {
-          const suiteKey = String(suite.id);
-          const suiteCases = grouped.get(suiteKey) ?? [];
-          const open = !!openSuites[suiteKey];
-          const suiteSortDir = caseSortPerSuite[suiteKey] || defaultCaseSortDir;
-          const totalSelected = suiteCases.filter((c) => selectedCases.has(c.id)).length;
-          const suiteChecked = selectedSuites.has(suite.id);
-          const suiteIndeterminate =
-            suiteCases.length > 0 && totalSelected > 0 && totalSelected < suiteCases.length;
-          const isRenamingSuite = editingSuiteId === suite.id;
+          // Calculate total cases including nested suites recursively
+          const getTotalCasesCount = (suiteId: number): number => {
+            const directCases = grouped.get(String(suiteId)) ?? [];
+            const children = getChildSuites(suiteId);
+            const childrenCases = children.reduce((sum, child) => sum + getTotalCasesCount(child.id), 0);
+            return directCases.length + childrenCases;
+          };
 
-          return (
-            <CaseSuiteCard
-              key={suiteKey}
-              suiteKey={suiteKey}
-              title={suite.name}
-              icon={<FolderIcon className="text-slate-700 dark:text-slate-300" />}
-              description={`${suiteCases.length} case(s)`}
-              open={open}
-              onToggle={() => toggleSuiteOpen(suiteKey)}
-              onAddCase={() => goNewCase(suite.id)}
-              sortDir={suiteSortDir}
-              onToggleSort={() => toggleSuiteSortDirection(suiteKey)}
-              onDragOver={allowDrop(suiteKey)}
-              onDrop={dropTo(suiteKey)}
-              cols={cols}
-              cases={suiteCases}
-              gridTemplate={GRID_TMPL}
-              suiteSelectable
-              suiteChecked={suiteChecked}
-              suiteIndeterminate={suiteIndeterminate && !suiteChecked}
-              onSuiteCheck={(checked) => toggleSuiteCheckbox(suiteKey, checked)}
-              renameControls={{
-                showRename: !isRenamingSuite,
-                onStartRename: () => startRenameSuite(suite),
-                isRenaming: isRenamingSuite,
-                renameName: editSuiteName,
-                setRenameName: setEditSuiteName,
-                onSaveRename: saveRename,
-                onCancelRename: cancelRename,
-              }}
-              {...caseRowsProps}
-            />
-          );
+          const renderSuiteWithChildren = (s: Suite): React.ReactElement => {
+            const suiteKey = String(s.id);
+            const suiteCases = grouped.get(suiteKey) ?? [];
+            const open = !!openSuites[suiteKey];
+            const suiteSortDir = caseSortPerSuite[suiteKey] || defaultCaseSortDir;
+            const totalSelected = suiteCases.filter((c) => selectedCases.has(c.id)).length;
+            const suiteChecked = selectedSuites.has(s.id);
+            const suiteIndeterminate =
+              suiteCases.length > 0 && totalSelected > 0 && totalSelected < suiteCases.length;
+            const isRenamingSuite = editingSuiteId === s.id;
+            const childSuites = getChildSuites(s.id);
+
+            const hasCases = suiteCases.length > 0;
+            const totalCasesCount = getTotalCasesCount(s.id);
+
+            // Build display title - always show just the suite name
+            const displayTitle = s.name;
+
+            return (
+              <div key={suiteKey}>
+                <CaseSuiteCard
+                  suiteKey={suiteKey}
+                  title={displayTitle}
+                  icon={<FolderIcon className="text-slate-700 dark:text-slate-300" />}
+                  description={`${totalCasesCount} case(s)`}
+                  open={open}
+                  onToggle={() => toggleSuiteOpen(suiteKey)}
+                  onAddCase={() => goNewCase(s.id)}
+                  onAddSubsuite={() => {
+                    setParentSuiteForNew(s.id);
+                    setShowSuiteModal(true);
+                  }}
+                  depth={s.depth}
+                  sortDir={suiteSortDir}
+                  onToggleSort={() => toggleSuiteSortDirection(suiteKey)}
+                  onDragOver={allowDrop(suiteKey)}
+                  onDrop={dropTo(suiteKey)}
+                  cols={cols}
+                  cases={suiteCases}
+                  gridTemplate={gridTemplate}
+                  suiteSelectable
+                  suiteChecked={suiteChecked}
+                  suiteIndeterminate={suiteIndeterminate && !suiteChecked}
+                  onSuiteCheck={(checked) => toggleSuiteCheckbox(suiteKey, checked)}
+                  hasChildSuites={childSuites.length > 0}
+                  renameControls={{
+                    showRename: !isRenamingSuite,
+                    onStartRename: () => startRenameSuite(s),
+                    isRenaming: isRenamingSuite,
+                    renameName: editSuiteName,
+                    setRenameName: setEditSuiteName,
+                    onSaveRename: saveRename,
+                    onCancelRename: cancelRename,
+                  }}
+                  {...caseRowsProps}
+                />
+                {/* Render child suites only when parent is open */}
+                {open && childSuites.length > 0 && (
+                  <div className="mt-3 pl-4 space-y-3 border-l-2 border-slate-200 dark:border-slate-700">
+                    {childSuites.map(child => renderSuiteWithChildren(child))}
+                  </div>
+                )}
+              </div>
+            );
+          };
+
+          return renderSuiteWithChildren(suite);
         })}
       </section>
 
@@ -543,10 +664,16 @@ export default function TestCasesPage() {
       {showSuiteModal && (
         <CreateSuiteModal
           projectId={projectId}
-          onClose={() => setShowSuiteModal(false)}
+          parentSuiteId={parentSuiteForNew}
+          availableSuites={suites}
+          onClose={() => {
+            setShowSuiteModal(false);
+            setParentSuiteForNew(null);
+          }}
           onCreated={(s) => {
             setSuites((prev) => [s, ...prev]);
             setOpenSuites((o) => ({ ...o, [s.id]: true }));
+            setParentSuiteForNew(null);
           }}
         />
       )}

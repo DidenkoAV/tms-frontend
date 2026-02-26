@@ -3,6 +3,7 @@ import { useEffect, useRef, useState } from "react";
 import { exportCases, importCases } from "@/entities/test-case";
 import { UploadIcon, DownloadIcon, ChevronDownIcon } from "@/shared/ui/icons";
 import { useConfirm } from "@/shared/ui/alert/Confirm";
+import { http } from "@/lib/http";
 
 interface Props {
   projectId: number;
@@ -14,8 +15,11 @@ type ExportFmt = "json";
 
 export default function ImportExportPanelMini({ projectId, onAlert, onImported }: Props) {
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const fileInputTestRailRef = useRef<HTMLInputElement>(null);
   const wrapExportRef = useRef<HTMLDivElement>(null);
   const wrapImportRef = useRef<HTMLDivElement>(null);
+  const exportTimerRef = useRef<NodeJS.Timeout | null>(null);
+  const importTimerRef = useRef<NodeJS.Timeout | null>(null);
 
   const [busy, setBusy] = useState(false);
   const [menuExport, setMenuExport] = useState(false);
@@ -23,6 +27,29 @@ export default function ImportExportPanelMini({ projectId, onAlert, onImported }
   const confirm = useConfirm();
 
   const showAlert = (text: string, kind: "info" | "error" = "info") => onAlert?.(text, kind);
+
+  /* ========= HOVER HANDLERS ========= */
+  const handleExportEnter = () => {
+    if (exportTimerRef.current) clearTimeout(exportTimerRef.current);
+    setMenuExport(true);
+  };
+
+  const handleExportLeave = () => {
+    exportTimerRef.current = setTimeout(() => {
+      setMenuExport(false);
+    }, 150);
+  };
+
+  const handleImportEnter = () => {
+    if (importTimerRef.current) clearTimeout(importTimerRef.current);
+    setMenuImport(true);
+  };
+
+  const handleImportLeave = () => {
+    importTimerRef.current = setTimeout(() => {
+      setMenuImport(false);
+    }, 150);
+  };
 
   /* ========= EXPORT ========= */
   const doExport = async (format: ExportFmt = "json") => {
@@ -82,22 +109,62 @@ export default function ImportExportPanelMini({ projectId, onAlert, onImported }
     });
   };
 
+  /* ========= IMPORT FROM TESTRAIL ========= */
+  const handleTestRailImport = async (file: File, overwrite = false) => {
+    try {
+      setBusy(true);
+      const formData = new FormData();
+      formData.append("file", file);
+
+      const { data } = await http.post(
+        `/api/projects/${projectId}/cases/import/testrail`,
+        formData,
+        {
+          params: { overwriteExisting: overwrite },
+          headers: {
+            'Content-Type': 'multipart/form-data',
+          },
+        }
+      );
+
+      showAlert?.(
+        `Import completed: ${data.imported} imported, ${data.skipped} skipped${
+          data.updated ? `, ${data.updated} updated` : ""
+        }`
+      );
+      onImported?.();
+    } catch (e: any) {
+      showAlert?.(e?.response?.data?.message || "Import failed", "error");
+    } finally {
+      setBusy(false);
+      if (fileInputTestRailRef.current) fileInputTestRailRef.current.value = "";
+    }
+  };
+
+  const onTestRailFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    confirm.open(
+      "Do you want to replace existing test cases if they already exist in this project?",
+      () => handleTestRailImport(file, true),
+      { title: "Overwrite existing cases?", okText: "Import (overwrite)", cancelText: "Import (skip)" }
+    );
+    requestAnimationFrame(() => {
+      const cancelBtn = document.querySelector<HTMLButtonElement>("[data-confirm-cancel]");
+      cancelBtn?.addEventListener("click", () => handleTestRailImport(file, false), { once: true });
+    });
+  };
+
   /* ========= MENU UX ========= */
   useEffect(() => {
-    const onDocClick = (e: MouseEvent) => {
-      const targets = [wrapExportRef.current, wrapImportRef.current];
-      if (!targets.some((r) => r?.contains(e.target as Node))) {
-        setMenuExport(false);
-        setMenuImport(false);
-      }
-    };
     const onEsc = (e: KeyboardEvent) =>
       e.key === "Escape" && (setMenuExport(false), setMenuImport(false));
-    document.addEventListener("mousedown", onDocClick);
     document.addEventListener("keydown", onEsc);
     return () => {
-      document.removeEventListener("mousedown", onDocClick);
       document.removeEventListener("keydown", onEsc);
+      // Cleanup timers
+      if (exportTimerRef.current) clearTimeout(exportTimerRef.current);
+      if (importTimerRef.current) clearTimeout(importTimerRef.current);
     };
   }, []);
 
@@ -116,7 +183,12 @@ export default function ImportExportPanelMini({ projectId, onAlert, onImported }
     <>
       <div className="relative flex items-center gap-1.5">
         {/* Export Split Button */}
-        <div ref={wrapExportRef} className="relative">
+        <div
+          ref={wrapExportRef}
+          className="relative"
+          onMouseEnter={handleExportEnter}
+          onMouseLeave={handleExportLeave}
+        >
           <div className="flex">
             <button
               disabled={busy}
@@ -142,29 +214,44 @@ export default function ImportExportPanelMini({ projectId, onAlert, onImported }
 
           {menuExport && (
             <div
-              className="absolute z-30 mt-[-1px] min-w-[80px] left-0 rounded-b-lg border border-t-0
-                         border-slate-300 bg-white/98 text-slate-800 shadow-[0_6px_18px_-10px_rgba(0,0,0,.25)]
-                         dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100
-                         animate-[menuIn_.12s_ease-out_both]"
+              className="absolute z-30 mt-1 min-w-[140px] left-0 rounded-lg border
+                         border-slate-200 bg-white shadow-lg
+                         dark:border-slate-700 dark:bg-slate-800
+                         animate-[menuIn_.15s_ease-out_both]
+                         overflow-hidden"
             >
-              <button
-                onClick={() => doExport("json")}
-                className="block w-full text-center px-2.5 py-[3px] text-[11.5px]
-                           text-slate-700 hover:bg-slate-100 dark:text-slate-100 dark:hover:bg-slate-700
-                           rounded-b-lg transition"
-              >
-                .json
-              </button>
+              <div className="py-1">
+                <button
+                  onClick={() => doExport("json")}
+                  className="group w-full flex items-center justify-between px-3 py-2 text-sm
+                             text-slate-700 hover:bg-slate-50
+                             dark:text-slate-200 dark:hover:bg-slate-700/50
+                             transition-colors duration-150"
+                >
+                  <span className="flex items-center gap-2">
+                    <svg className="w-4 h-4 text-slate-400 dark:text-slate-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                    </svg>
+                    <span className="font-medium">JSON</span>
+                  </span>
+                  <span className="text-xs text-slate-400 dark:text-slate-500 font-mono">.json</span>
+                </button>
+              </div>
             </div>
           )}
         </div>
 
         {/* Import Split Button */}
-        <div ref={wrapImportRef} className="relative">
+        <div
+          ref={wrapImportRef}
+          className="relative"
+          onMouseEnter={handleImportEnter}
+          onMouseLeave={handleImportLeave}
+        >
           <div className="flex">
             <button
               disabled={busy}
-              onClick={() => fileInputRef.current?.click()}
+              onClick={() => setMenuImport((v) => !v)}
               className={`${btnBase} justify-center rounded-r-none px-2.5 ${ringImport}`}
             >
               <UploadIcon className="w-3 h-3 opacity-80" />
@@ -186,22 +273,47 @@ export default function ImportExportPanelMini({ projectId, onAlert, onImported }
 
           {menuImport && (
             <div
-              className="absolute z-30 mt-[-1px] min-w-[120px] max-w-[140px] left-0 rounded-b-lg border border-t-0
-                         border-slate-300 bg-white/98 text-slate-800 shadow-[0_6px_18px_-10px_rgba(0,0,0,.25)]
-                         dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100
-                         animate-[menuIn_.12s_ease-out_both]"
+              className="absolute z-30 mt-1 min-w-[200px] left-0 rounded-lg border
+                         border-slate-200 bg-white shadow-lg
+                         dark:border-slate-700 dark:bg-slate-800
+                         animate-[menuIn_.15s_ease-out_both]
+                         overflow-hidden"
             >
-              <button
-                onClick={() => {
-                  setMenuImport(false);
-                  fileInputRef.current?.click();
-                }}
-                className="block w-full text-center px-2.5 py-[3px] text-[11.5px]
-                           text-slate-700 hover:bg-slate-100 dark:text-slate-100 dark:hover:bg-slate-700
-                           rounded-b-lg transition"
-              >
-                from TestForge
-              </button>
+              <div className="py-1">
+                <button
+                  onClick={() => {
+                    setMenuImport(false);
+                    fileInputRef.current?.click();
+                  }}
+                  className="group w-full flex items-center gap-2 px-3 py-2 text-sm
+                             text-slate-700 hover:bg-slate-50
+                             dark:text-slate-200 dark:hover:bg-slate-700/50
+                             transition-colors duration-150"
+                >
+                  <svg className="w-4 h-4 text-slate-400 dark:text-slate-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
+                  </svg>
+                  <span className="font-medium">from TestForge</span>
+                </button>
+
+                <div className="h-px bg-slate-200 dark:bg-slate-700 my-1" />
+
+                <button
+                  onClick={() => {
+                    setMenuImport(false);
+                    fileInputTestRailRef.current?.click();
+                  }}
+                  className="group w-full flex items-center gap-2 px-3 py-2 text-sm
+                             text-slate-700 hover:bg-slate-50
+                             dark:text-slate-200 dark:hover:bg-slate-700/50
+                             transition-colors duration-150"
+                >
+                  <svg className="w-4 h-4 text-slate-400 dark:text-slate-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                  </svg>
+                  <span className="font-medium">from TestRail XML</span>
+                </button>
+              </div>
             </div>
           )}
         </div>
@@ -211,6 +323,13 @@ export default function ImportExportPanelMini({ projectId, onAlert, onImported }
           type="file"
           accept=".json,application/json"
           onChange={onFileChange}
+          className="hidden"
+        />
+        <input
+          ref={fileInputTestRailRef}
+          type="file"
+          accept=".xml,application/xml,text/xml"
+          onChange={onTestRailFileChange}
           className="hidden"
         />
       </div>

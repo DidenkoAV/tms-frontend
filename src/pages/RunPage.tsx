@@ -25,7 +25,6 @@ import {
   AddToRunModal,
   RunToolbar,
 } from "@/features/runs";
-import RunJenkinsTriggerButton from "@/features/integrations/jenkins/ui/RunJenkinsTriggerButton";
 
 /* ---------- icons ---------- */
 function IconBack() {
@@ -107,9 +106,6 @@ export default function RunPage() {
   const [suites, setSuites] = useState<Suite[]>([]);
   const [loading, setLoading] = useState(true);
   const [err, setErr] = useState<string | null>(null);
-
-  // current groupId for Jenkins integration
-  const [jenkinsGroupId, setJenkinsGroupId] = useState<number | null>(null);
 
   const defaultCols: VisibleCols = {
     status: true,
@@ -199,13 +195,6 @@ export default function RunPage() {
         setAllCases(arr);
         setCasesMap(Object.fromEntries(arr.map((c) => [c.id, c])));
         setSuites(suitesRes);
-
-        // for now just take the first group of the user
-        if (groupsRes.length > 0) {
-          setJenkinsGroupId(groupsRes[0].id);
-        } else {
-          setJenkinsGroupId(null);
-        }
       } catch (e: any) {
         if (!alive) return;
         setErr(e?.response?.data?.message || "Failed to load run");
@@ -222,15 +211,6 @@ export default function RunPage() {
   const runCasesFiltered = useMemo(
     () => runCases.filter((rc) => !!casesMap[rc.caseId]),
     [runCases, casesMap]
-  );
-  const jenkinsRunCases = useMemo(
-    () =>
-      runCasesFiltered.map((rc) => ({
-        caseId: rc.caseId,
-        automationStatus: casesMap[rc.caseId]?.automationStatus ?? null,
-        title: casesMap[rc.caseId]?.title ?? null,
-      })),
-    [runCasesFiltered, casesMap]
   );
 
   /* ---------- Pagination ---------- */
@@ -257,7 +237,6 @@ export default function RunPage() {
 
   const [picked, setPicked] = useState<Set<number>>(new Set());
   const pickedCount = picked.size;
-  const pickedIdsForJenkins = useMemo(() => Array.from(picked), [picked]);
 
   function togglePickCase(caseId: number, checked: boolean) {
     setPicked((prev) => {
@@ -357,10 +336,6 @@ export default function RunPage() {
     (cols.jira ? 1 : 0) +
     (cols.status ? 1 : 0);
 
-  // ---------- Jenkins integration on Run ----------
-  const canTriggerJenkins =
-    !!jenkinsGroupId && runCasesFiltered.length > 0 && !loading;
-
   /* ---------- Render ---------- */
   return (
     <div className="relative max-w-6xl px-4 py-8 pb-24 mx-auto">
@@ -391,16 +366,6 @@ export default function RunPage() {
             </p>
           )}
         </div>
-
-        {jenkinsGroupId && jenkinsGroupId > 0 && (
-          <RunJenkinsTriggerButton
-            groupId={jenkinsGroupId}
-            runId={rid}
-            disabled={!canTriggerJenkins}
-            runCases={jenkinsRunCases}
-            selectedCaseIds={pickedIdsForJenkins}
-          />
-        )}
       </header>
 
       <section className="flex flex-wrap items-center justify-between gap-4 mt-2 mb-3">

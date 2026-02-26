@@ -4,6 +4,8 @@
 export type Suite = {
   id: number;
   projectId: number;
+  parentId?: number | null;
+  depth: number;
   name: string;
   description?: string | null;
   archived: boolean;
@@ -13,6 +15,7 @@ export type Suite = {
 export type SuiteCreateRequest = {
   name: string;
   description?: string | null;
+  parentId?: number | null;
 };
 
 /** Update suite (PATCH) */

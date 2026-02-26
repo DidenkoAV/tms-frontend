@@ -4,22 +4,13 @@ import { useEffect, useState } from "react";
 import type { Me } from "@/entities/group";
 
 import JiraIntegrationForm from "@/features/integrations/jira/ui/JiraIntegrationForm";
-import SlackIntegrationForm from "@/features/integrations/slack/ui/SlackIntegrationForm";
-import JenkinsIntegrationForm from "@/features/integrations/jenkins/ui/JenkinsIntegrationForm";
-import TeamsIntegrationForm from "@/features/integrations/teams/ui/TeamsIntegrationForm";
 
 import { getJiraConnection } from "@/features/integrations/jira/api";
-import { getSlackConnection } from "@/features/integrations/slack/api";
-import { getJenkinsConnection } from "@/features/integrations/jenkins/api";
-import { getTeamsConnection } from "@/features/integrations/teams/api";
 
 import { CheckCircle2, XCircle } from "lucide-react";
 
 /* --- logos --- */
 import jiraLogo from "@/public/logos/jira.png";
-import slackLogo from "@/public/logos/slack.png";
-import jenkinsLogo from "@/public/logos/jenkins.png";
-import teamsLogo from "@/public/logos/teams.jpeg";
 
 type Props = {
   me: Me | null;
@@ -38,16 +29,10 @@ export default function IntegrationsSection({
   ButtonPrimary,
   ButtonDangerOutline,
 }: Props) {
-  const [tab, setTab] = useState<"jira" | "slack" | "jenkins" | "teams">(
-    "jira"
-  );
   const [groupId, setGroupId] = useState<number | null>(null);
 
   const [connected, setConnected] = useState({
     jira: false,
-    slack: false,
-    jenkins: false,
-    teams: false,
   });
 
   // Get current group ID
@@ -60,9 +45,6 @@ export default function IntegrationsSection({
 
   const tabs = [
     { key: "jira", label: "Jira", logo: jiraLogo },
-    { key: "slack", label: "Slack", logo: slackLogo },
-    { key: "teams", label: "Teams", logo: teamsLogo },
-    { key: "jenkins", label: "Jenkins", logo: jenkinsLogo },
   ] as const;
 
   /* ---------- Jira status ---------- */
@@ -87,94 +69,14 @@ export default function IntegrationsSection({
     };
   }, [groupId]);
 
-  /* ---------- Slack status ---------- */
-  useEffect(() => {
-    if (!groupId) return;
 
-    let alive = true;
 
-    (async () => {
-      try {
-        const conn = await getSlackConnection(groupId);
-        if (!alive) return;
-        setConnected((prev) => ({ ...prev, slack: !!conn && conn.active }));
-      } catch {
-        if (!alive) return;
-        setConnected((prev) => ({ ...prev, slack: false }));
-      }
-    })();
 
-    return () => {
-      alive = false;
-    };
-  }, [groupId]);
-
-  /* ---------- Jenkins status ---------- */
-  useEffect(() => {
-    if (!groupId) return;
-
-    let alive = true;
-
-    (async () => {
-      try {
-        const conn = await getJenkinsConnection(groupId);
-        if (!alive) return;
-        setConnected((prev) => ({
-          ...prev,
-          jenkins: !!conn?.active,
-        }));
-      } catch {
-        if (!alive) return;
-        setConnected((prev) => ({ ...prev, jenkins: false }));
-      }
-    })();
-
-    return () => {
-      alive = false;
-    };
-  }, [groupId]);
-
-  /* ---------- Teams status ---------- */
-  useEffect(() => {
-    if (!groupId) return;
-
-    let alive = true;
-
-    (async () => {
-      try {
-        const conn = await getTeamsConnection(groupId);
-        if (!alive) return;
-        setConnected((prev) => ({
-          ...prev,
-          teams: !!conn && (conn.active ?? !!conn.webhookUrl),
-        }));
-      } catch {
-        if (!alive) return;
-        setConnected((prev) => ({ ...prev, teams: false }));
-      }
-    })();
-
-    return () => {
-      alive = false;
-    };
-  }, [groupId]);
 
   /* ---------- callbacks from forms ---------- */
 
   function handleJiraStatusChange(isConnected: boolean) {
     setConnected((prev) => ({ ...prev, jira: isConnected }));
-  }
-
-  function handleSlackStatusChange(isConnected: boolean) {
-    setConnected((prev) => ({ ...prev, slack: isConnected }));
-  }
-
-  function handleJenkinsStatusChange(isConnected: boolean) {
-    setConnected((prev) => ({ ...prev, jenkins: isConnected }));
-  }
-
-  function handleTeamsStatusChange(isConnected: boolean) {
-    setConnected((prev) => ({ ...prev, teams: isConnected }));
   }
 
   return (
@@ -204,87 +106,63 @@ export default function IntegrationsSection({
         </div>
       )}
 
-      {/* tabs */}
-      <div
-        className="grid grid-cols-1 gap-4 mb-6  sm:grid-cols-2 lg:grid-cols-4"
-      >
-        {tabs.map((t) => {
-          const active = tab === t.key;
-          const isConnected = connected[t.key as keyof typeof connected];
+      {/* Jira integration card */}
+      <div className="mb-6">
+        <div className="flex items-center gap-3 p-4 border rounded-2xl shadow-sm border-slate-200 bg-white dark:border-slate-700 dark:bg-slate-900">
+          {/* Logo container */}
+          <div
+            className={`
+              flex h-9 w-9 items-center justify-center rounded-xl
+              bg-white shadow-sm dark:bg-slate-800
+              ${
+                connected.jira
+                  ? "ring-2 ring-emerald-400/80"
+                  : "ring-1 ring-slate-100/70 dark:ring-slate-700/80"
+              }
+            `}
+          >
+            <img
+              src={jiraLogo}
+              alt="Jira"
+              className="object-contain w-6 h-6"
+            />
+          </div>
 
-          return (
-            <button
-              key={t.key}
-              onClick={() => setTab(t.key)}
-              className={`
-                group relative flex items-center gap-3 rounded-2xl border px-4 py-3 
-                text-sm font-medium transition-all duration-200
-                shadow-sm w-full
-                hover:-translate-y-0.5 hover:shadow-md hover:border-sky-300/70
-                dark:hover:border-slate-500
-                ${
-                  active
-                    ? "border-sky-400 bg-sky-50 dark:border-sky-500 dark:bg-slate-800"
-                    : "border-slate-200 bg-white/90 dark:border-slate-700 dark:bg-slate-900/80"
-                }
-              `}
+          <div className="flex flex-col flex-1">
+            <span className="text-sm font-semibold text-slate-800 dark:text-slate-50">
+              Jira
+            </span>
+
+            <span
+              className={`mt-0.5 inline-flex items-center gap-1 text-xs ${
+                connected.jira
+                  ? "text-emerald-600 dark:text-emerald-400"
+                  : "text-slate-400 dark:text-slate-500"
+              }`}
             >
-              {/* Logo container with fixed size */}
-              <div
-                className={`
-                  flex h-9 w-9 items-center justify-center rounded-xl 
-                  bg-white shadow-sm dark:bg-slate-800
-                  ${
-                    isConnected
-                      ? "ring-2 ring-emerald-400/80"
-                      : "ring-1 ring-slate-100/70 dark:ring-slate-700/80"
-                  }
-                `}
-              >
-                <img
-                  src={t.logo}
-                  alt={t.label}
-                  className="object-contain w-6 h-6"
-                />
-              </div>
-
-              <div className="flex flex-col flex-1 text-left">
-                <span className="text-sm font-semibold text-slate-800 dark:text-slate-50">
-                  {t.label}
-                </span>
-
-                <span
-                  className={`mt-0.5 inline-flex items-center gap-1 text-xs ${
-                    isConnected
-                      ? "text-emerald-600 dark:text-emerald-400"
-                      : "text-slate-400 dark:text-slate-500"
-                  }`}
-                >
-                  {isConnected ? (
-                    <>
-                      <CheckCircle2 className="w-3.5 h-3.5" />
-                      Connected
-                    </>
-                  ) : (
-                    <>
-                      <XCircle className="w-3.5 h-3.5" />
-                      Not connected
-                    </>
-                  )}
-                </span>
-              </div>
-            </button>
-          );
-        })}
+              {connected.jira ? (
+                <>
+                  <CheckCircle2 className="w-3.5 h-3.5" />
+                  Connected
+                </>
+              ) : (
+                <>
+                  <XCircle className="w-3.5 h-3.5" />
+                  Not connected
+                </>
+              )}
+            </span>
+          </div>
+        </div>
       </div>
 
-      {/* tab content */}
+      {/* Jira integration form */}
       <div className="p-5 transition-all border shadow-sm rounded-xl border-slate-200 bg-slate-50 dark:border-slate-800 dark:bg-slate-900/40">
         {!groupId && (
           <div className="text-slate-500">No groups available</div>
         )}
 
-        {groupId && tab === "jira" && (
+        {groupId && (
           <JiraIntegrationForm
             groupId={groupId}
             Field={Field}
@@ -292,39 +170,6 @@ export default function IntegrationsSection({
             ButtonPrimary={ButtonPrimary}
             ButtonDangerOutline={ButtonDangerOutline}
             onStatusChange={handleJiraStatusChange}
-          />
-        )}
-
-        {groupId && tab === "slack" && (
-          <SlackIntegrationForm
-            groupId={groupId}
-            Field={Field}
-            Input={Input}
-            ButtonPrimary={ButtonPrimary}
-            ButtonDangerOutline={ButtonDangerOutline}
-            onStatusChange={handleSlackStatusChange}
-          />
-        )}
-
-        {groupId && tab === "teams" && (
-          <TeamsIntegrationForm
-            groupId={groupId}
-            Field={Field}
-            Input={Input}
-            ButtonPrimary={ButtonPrimary}
-            ButtonDangerOutline={ButtonDangerOutline}
-            onStatusChange={handleTeamsStatusChange}
-          />
-        )}
-
-        {groupId && tab === "jenkins" && (
-          <JenkinsIntegrationForm
-            groupId={groupId}
-            Field={Field}
-            Input={Input}
-            ButtonPrimary={ButtonPrimary}
-            ButtonDangerOutline={ButtonDangerOutline}
-            onStatusChange={handleJenkinsStatusChange}
           />
         )}
       </div>

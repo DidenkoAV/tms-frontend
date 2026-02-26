@@ -127,7 +127,7 @@ export default function CaseRow({
         e.dataTransfer.effectAllowed = "move";
       }}
     >
-      <div className={gridCols}>
+      <div className="grid gap-2" style={{ gridTemplateColumns: gridCols }}>
         {/* TITLE */}
         <div className="flex items-center min-w-0 gap-2">
           <TFCheckbox

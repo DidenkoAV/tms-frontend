@@ -23,6 +23,8 @@ type CaseSuiteCardProps = {
   open: boolean;
   onToggle: () => void;
   onAddCase: () => void;
+  onAddSubsuite?: () => void;
+  depth?: number;
   sortDir: "asc" | "desc";
   onToggleSort: () => void;
   onDragOver: (e: React.DragEvent) => void;
@@ -35,6 +37,7 @@ type CaseSuiteCardProps = {
   suiteIndeterminate: boolean;
   onSuiteCheck: (checked: boolean) => void;
   renameControls?: RenameControls | null;
+  hasChildSuites?: boolean;
 } & Omit<CaseRowsListProps, "cases" | "cols" | "gridTemplate">;
 
 const noop = () => undefined;
@@ -47,6 +50,8 @@ export default function CaseSuiteCard({
   open,
   onToggle,
   onAddCase,
+  onAddSubsuite,
+  depth,
   sortDir,
   onToggleSort,
   onDragOver,
@@ -59,6 +64,7 @@ export default function CaseSuiteCard({
   suiteIndeterminate,
   onSuiteCheck,
   renameControls,
+  hasChildSuites,
   ...caseRowsProps
 }: CaseSuiteCardProps) {
   const rename = renameControls ?? null;
@@ -72,12 +78,15 @@ export default function CaseSuiteCard({
       open={open}
       onToggle={onToggle}
       onAdd={onAddCase}
+      onAddSubsuite={onAddSubsuite}
+      depth={depth}
       sortDir={sortDir}
       onToggleSort={onToggleSort}
       onDragOver={onDragOver}
       onDrop={onDrop}
       cols={cols}
       itemsCount={cases.length}
+      hasChildSuites={hasChildSuites}
       suiteSelectable={suiteSelectable}
       suiteChecked={suiteChecked}
       suiteIndeterminate={suiteIndeterminate}

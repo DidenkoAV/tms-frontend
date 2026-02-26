@@ -7,6 +7,9 @@ export interface TableHeaderActionsProps<
 > {
   selectedCount?: number;
   onBulkDelete?: () => void;
+  onSelectAll?: () => void;
+  onDeselectAll?: () => void;
+  allSelected?: boolean;
   onToggleCreate?: () => void;
   showCreate?: boolean;
   cols?: T;
@@ -27,6 +30,9 @@ export default function TableHeaderActions<
 >({
   selectedCount = 0,
   onBulkDelete,
+  onSelectAll,
+  onDeselectAll,
+  allSelected = false,
   onToggleCreate,
   showCreate,
   cols,
@@ -72,6 +78,18 @@ export default function TableHeaderActions<
 
   return (
     <div className={`flex items-center gap-2 ${className}`}>
+      {/* --- Select All / Deselect All Button --- */}
+      {(onSelectAll || onDeselectAll) && (
+        <button
+          type="button"
+          onClick={allSelected ? onDeselectAll : onSelectAll}
+          className={baseButton}
+          title={allSelected ? "Deselect all" : "Select all"}
+        >
+          {allSelected ? "Deselect All" : "Select All"}
+        </button>
+      )}
+
       {/* --- Delete Button --- */}
       {onBulkDelete && deleteVariant === "button" && (
         <button
@@ -94,10 +112,23 @@ export default function TableHeaderActions<
         <button
           type="button"
           onClick={onBulkDelete}
-          className={`inline-flex ${sizeSquare} items-center justify-center rounded-2xl border border-rose-200 bg-white text-rose-500 shadow-sm transition hover:bg-rose-50 hover:shadow-md dark:border-rose-800 dark:bg-slate-900 dark:text-rose-300 dark:hover:bg-rose-900/30`}
+          className={[
+            "inline-flex items-center gap-1.5 select-none border transition-all duration-200 ease-out",
+            "border-rose-200 bg-white/95 text-rose-600 shadow-[0_1px_2px_rgba(15,23,42,0.06)]",
+            "hover:-translate-y-0.5 hover:shadow-md hover:border-rose-300 hover:bg-rose-50",
+            "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-rose-200 focus-visible:ring-offset-2",
+            "active:translate-y-0",
+            "dark:border-rose-800 dark:bg-slate-900 dark:text-rose-300 dark:hover:bg-rose-900/30",
+            "dark:focus-visible:ring-rose-600 dark:focus-visible:ring-offset-slate-900",
+            sizeHeight,
+            resolvedRadius,
+            resolvedPadding,
+            resolvedFont,
+          ].join(" ")}
           title={`Delete ${selectedCount} selected`}
         >
-          <TrashIcon className="w-3 h-3" />
+          <TrashIcon className="w-3 h-3 text-rose-500 dark:text-rose-400" />
+          Delete
         </button>
       )}
 

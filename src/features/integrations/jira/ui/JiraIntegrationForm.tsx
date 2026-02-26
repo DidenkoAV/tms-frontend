@@ -29,6 +29,7 @@ export default function JiraIntegrationForm({
 }: Props) {
   const [loading, setLoading] = useState(true);
   const [msg, setMsg] = useState<Msg>(null);
+  const [isEditing, setIsEditing] = useState(false);
 
   // form state
   const [baseUrl, setBaseUrl] = useState("");
@@ -108,6 +109,7 @@ export default function JiraIntegrationForm({
         text: "Jira connection saved.",
       });
 
+      setIsEditing(false);
       onStatusChange?.(true);
     } catch (e: any) {
       setMsg({
@@ -118,6 +120,25 @@ export default function JiraIntegrationForm({
     } finally {
       clearMsgSoon();
     }
+  }
+
+  function handleCancel() {
+    setIsEditing(false);
+    // Reload settings to reset form
+    (async () => {
+      try {
+        const c = await getJiraConnection(groupId);
+        if (c) {
+          setBaseUrl(c.baseUrl || "");
+          setEmail(c.email || "");
+          setDefaultProject(c.defaultProject || "");
+          setHasSavedToken(c.hasToken);
+          setToken("");
+        }
+      } catch {
+        // Silent fail
+      }
+    })();
   }
 
   async function onTest() {
@@ -182,6 +203,7 @@ export default function JiraIntegrationForm({
               value={baseUrl}
               onChange={(e) => setBaseUrl(e.target.value)}
               placeholder="https://your-domain.atlassian.net"
+              disabled={!isEditing}
             />
           </Field>
 
@@ -190,6 +212,7 @@ export default function JiraIntegrationForm({
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               placeholder="jira-bot@company.com"
+              disabled={!isEditing}
             />
           </Field>
 
@@ -199,6 +222,7 @@ export default function JiraIntegrationForm({
               value={hasSavedToken && !token ? "************" : token}
               onChange={(e) => setToken(e.target.value)}
               placeholder="Paste Jira API token"
+              disabled={!isEditing}
             />
           </Field>
 
@@ -207,32 +231,53 @@ export default function JiraIntegrationForm({
               value={defaultProject}
               onChange={(e) => setDefaultProject(e.target.value)}
               placeholder="TES"
+              disabled={!isEditing}
             />
           </Field>
 
           <div className="flex gap-2">
-            <button
-              type="submit"
-              className="rounded-md bg-slate-900 px-3 py-1.5 text-xs font-medium text-white transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-50 dark:bg-slate-100 dark:text-slate-900 dark:hover:bg-slate-200"
-            >
-              Save
-            </button>
-
-            {hasSavedToken && (
+            {!isEditing ? (
               <>
                 <button
                   type="button"
-                  onClick={onTest}
+                  onClick={() => setIsEditing(true)}
                   className="rounded-md border border-slate-300 bg-slate-100 px-3 py-1.5 text-xs font-medium text-slate-700 transition hover:bg-slate-200 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200 dark:hover:bg-slate-700"
                 >
-                  Test
+                  Edit
+                </button>
+                {hasSavedToken && (
+                  <>
+                    <button
+                      type="button"
+                      onClick={onTest}
+                      className="rounded-md border border-slate-300 bg-slate-100 px-3 py-1.5 text-xs font-medium text-slate-700 transition hover:bg-slate-200 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200 dark:hover:bg-slate-700"
+                    >
+                      Test
+                    </button>
+                    <button
+                      type="button"
+                      onClick={onRemove}
+                      className="rounded-md border border-rose-300 bg-rose-50 px-3 py-1.5 text-xs font-medium text-rose-700 transition hover:bg-rose-100 dark:border-rose-800 dark:bg-rose-900/20 dark:text-rose-300 dark:hover:bg-rose-900/40"
+                    >
+                      Remove
+                    </button>
+                  </>
+                )}
+              </>
+            ) : (
+              <>
+                <button
+                  type="submit"
+                  className="rounded-md bg-slate-900 px-3 py-1.5 text-xs font-medium text-white transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-50 dark:bg-slate-100 dark:text-slate-900 dark:hover:bg-slate-200"
+                >
+                  Save
                 </button>
                 <button
                   type="button"
-                  onClick={onRemove}
-                  className="rounded-md border border-rose-300 bg-rose-50 px-3 py-1.5 text-xs font-medium text-rose-700 transition hover:bg-rose-100 dark:border-rose-800 dark:bg-rose-900/20 dark:text-rose-300 dark:hover:bg-rose-900/40"
+                  onClick={handleCancel}
+                  className="rounded-md border border-slate-300 bg-slate-100 px-3 py-1.5 text-xs font-medium text-slate-700 transition hover:bg-slate-200 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200 dark:hover:bg-slate-700"
                 >
-                  Remove
+                  Cancel
                 </button>
               </>
             )}

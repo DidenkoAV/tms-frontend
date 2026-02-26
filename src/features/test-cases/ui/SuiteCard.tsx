@@ -18,6 +18,8 @@ export type SuiteCardProps = {
   open: boolean;
   onToggle: () => void;
   onAdd: () => void;
+  onAddSubsuite?: () => void;
+  depth?: number;
 
   sortDir: "asc" | "desc";
   onToggleSort: () => void;
@@ -28,6 +30,7 @@ export type SuiteCardProps = {
 
   cols: Record<"priority"|"type"|"automation"|"author", boolean>;
   itemsCount: number;
+  hasChildSuites?: boolean;
 
   // selection
   suiteSelectable: boolean;
@@ -50,8 +53,8 @@ export type SuiteCardProps = {
 
 export default function SuiteCard(props: SuiteCardProps) {
   const {
-    zoneKey, title, icon, description, children, open, onToggle, onAdd,
-    sortDir, onToggleSort, onDragOver, onDrop, cols, itemsCount,
+    zoneKey, title, icon, description, children, open, onToggle, onAdd, onAddSubsuite, depth = 0,
+    sortDir, onToggleSort, onDragOver, onDrop, cols, itemsCount, hasChildSuites = false,
     suiteSelectable, suiteChecked, suiteIndeterminate, onSuiteCheck,
     showRename, onStartRename, isRenaming, renameName, setRenameName, onSaveRename, onCancelRename,
     gridCols,
@@ -133,6 +136,11 @@ export default function SuiteCard(props: SuiteCardProps) {
             <button type="button" onClick={onAdd} className={pillSm} title="Add case">
               <PlusIcon /> Case
             </button>
+            {onAddSubsuite && depth < 4 && (
+              <button type="button" onClick={onAddSubsuite} className={pillSm} title="Add subsuite">
+                <PlusIcon /> Subsuite
+              </button>
+            )}
             <button type="button" onClick={onToggleSort} className={pillSm} title={`Sort by Title (${sortDir === "asc" ? "A→Z" : "Z→A"})`}>
               <span className="text-base leading-none">{sortDir === "asc" ? "↑" : "↓"}</span>
             </button>
@@ -148,8 +156,9 @@ export default function SuiteCard(props: SuiteCardProps) {
       {/* body */}
       {open && (
         <div className="px-4 pb-3">
+          {/* Table header - always show when suite is open */}
           <div className="mb-2 rounded-xl border border-slate-200 bg-white px-3 py-2 dark:border-slate-800 dark:bg-[#0b1222]">
-            <div className={gridCols}>
+            <div className="grid gap-2" style={{ gridTemplateColumns: gridCols }}>
               <div className="text-[11px] uppercase tracking-wide text-slate-500 dark:text-slate-400">Case</div>
               {cols.priority  && <div className="text-[11px] uppercase tracking-wide text-slate-500 dark:text-slate-400">Priority</div>}
               {cols.type      && <div className="text-[11px] uppercase tracking-wide text-slate-500 dark:text-slate-400">Type</div>}
@@ -159,15 +168,16 @@ export default function SuiteCard(props: SuiteCardProps) {
             </div>
           </div>
 
+          {/* Cases list or empty state */}
           {itemsCount > 0 ? (
             <ul className="divide-y divide-slate-200 rounded-xl border border-slate-200 bg-white dark:divide-slate-800 dark:border-slate-800 dark:bg-[#0b1222]">
               {children}
             </ul>
-          ) : (
+          ) : !hasChildSuites ? (
             <div className="p-4 text-sm border border-dashed rounded-xl border-slate-300 text-slate-500 dark:border-slate-700/70 dark:text-slate-400">
               No cases. Click <b>Case</b> to add one.
             </div>
-          )}
+          ) : null}
         </div>
       )}
     </div>

@@ -5,6 +5,8 @@ import { AlertBanner } from "@/shared/ui/alert";
 
 type Props = {
   projectId: number;
+  parentSuiteId?: number | null;
+  availableSuites?: Suite[];
   onClose: () => void;
   onCreated: (suite: Suite) => void;
 };
@@ -12,13 +14,19 @@ type Props = {
 export type Suite = {
   id: number;
   projectId: number;
+  parentId?: number | null;
+  depth: number;
   name: string;
   description?: string | null;
   archived: boolean;
 };
 
-export default function CreateSuiteModal({ projectId, onClose, onCreated }: Props) {
-  const [sf, setSf] = useState<{ name: string; description: string }>({ name: "", description: "" });
+export default function CreateSuiteModal({ projectId, parentSuiteId, availableSuites = [], onClose, onCreated }: Props) {
+  const [sf, setSf] = useState<{ name: string; description: string; parentId: number | "" }>({
+    name: "",
+    description: "",
+    parentId: parentSuiteId ?? ""
+  });
   const [formErr, setFormErr] = useState<string | null>(null);
   const [busySuite, setBusySuite] = useState(false);
 
@@ -30,12 +38,18 @@ export default function CreateSuiteModal({ projectId, onClose, onCreated }: Prop
     setBusySuite(true);
 
     try {
-      const { data } = await http.post<Suite>(`/api/projects/${projectId}/suites`, {
+      const payload: any = {
         name: sf.name.trim(),
         description: sf.description.trim() || undefined,
-      });
+      };
+
+      if (sf.parentId !== "") {
+        payload.parentId = sf.parentId;
+      }
+
+      const { data } = await http.post<Suite>(`/api/projects/${projectId}/suites`, payload);
       onCreated(data);
-      setSf({ name: "", description: "" });
+      setSf({ name: "", description: "", parentId: "" });
       onClose();
     } catch (e: any) {
       setFormErr(e?.response?.data?.message || "Create suite failed");
@@ -74,6 +88,28 @@ export default function CreateSuiteModal({ projectId, onClose, onCreated }: Prop
         )}
 
         <form onSubmit={handleSubmit} className="grid gap-3">
+          {!parentSuiteId && availableSuites.length > 0 && (
+            <div>
+              <label className="block mb-1 text-sm text-slate-600 dark:text-slate-400">
+                Parent Suite (optional)
+              </label>
+              <select
+                className="w-full px-3 py-2 text-sm bg-white border outline-none rounded-xl border-slate-300 focus:border-slate-400 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100"
+                value={sf.parentId}
+                onChange={(e) => setSf((f) => ({ ...f, parentId: e.target.value === "" ? "" : Number(e.target.value) }))}
+              >
+                <option value="">-- Root level --</option>
+                {availableSuites
+                  .filter(s => s.depth < 4) // Max depth is 4 (0-4), so can only add children to depth 0-3
+                  .map(s => (
+                    <option key={s.id} value={s.id}>
+                      {"  ".repeat(s.depth)}{s.name} (depth {s.depth})
+                    </option>
+                  ))}
+              </select>
+            </div>
+          )}
+
           <div>
             <label className="block mb-1 text-sm text-slate-600 dark:text-slate-400">
               Name

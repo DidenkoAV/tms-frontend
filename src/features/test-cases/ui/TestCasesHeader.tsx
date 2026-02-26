@@ -14,6 +14,10 @@ interface Props {
   selectedSuites: Set<number>;
   selectedCases: Set<number>;
   onBulkDelete: () => void;
+  onSelectAll?: () => void;
+  onDeselectAll?: () => void;
+  totalSuites?: number;
+  totalCases?: number;
   onNewSuite: () => void;
 
   extraRight?: ReactNode;
@@ -27,10 +31,16 @@ export default function TestCasesHeader({
   selectedSuites,
   selectedCases,
   onBulkDelete,
+  onSelectAll,
+  onDeselectAll,
+  totalSuites = 0,
+  totalCases = 0,
   onNewSuite,
   extraRight,
 }: Props) {
   const selectedCount = selectedSuites.size + selectedCases.size;
+  const totalCount = totalSuites + totalCases;
+  const allSelected = totalCount > 0 && selectedCount === totalCount;
 
   const colItems = useMemo(
     () => [
@@ -74,6 +84,9 @@ export default function TestCasesHeader({
           <TableHeaderActions
             selectedCount={selectedCount}
             onBulkDelete={onBulkDelete}
+            onSelectAll={onSelectAll}
+            onDeselectAll={onDeselectAll}
+            allSelected={allSelected}
             onToggleCreate={onNewSuite}
             createLabel="New Suite"
             cols={cols}
