@@ -187,8 +187,24 @@ function TestCasesPageContent() {
       if (groupId) {
         try {
           const members = await getGroupMembers(groupId);
+          console.log("=== ASSIGNEE FILTERING DEBUG ===");
+          console.log("Project:", p.name);
+          console.log("Project groupPersonal:", p.groupPersonal);
+          console.log("Current user ID:", me?.id);
+          console.log("All members:", members);
+
           // Filter only ACTIVE members
-          setGroupMembers(members.filter(m => m.status === "ACTIVE"));
+          let activeMembers = members.filter(m => m.status === "ACTIVE");
+          console.log("Active members:", activeMembers);
+
+          // If project belongs to a personal group, only show current user
+          if (p.groupPersonal && me?.id) {
+            console.log("Filtering for personal group - keeping only user", me.id);
+            activeMembers = activeMembers.filter(m => m.userId === me.id);
+          }
+
+          console.log("Final members for assignee:", activeMembers);
+          setGroupMembers(activeMembers);
         } catch (e) {
           console.warn("Failed to load group members:", e);
           setGroupMembers([]);

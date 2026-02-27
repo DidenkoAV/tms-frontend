@@ -20,7 +20,13 @@ export default function AssigneeSelect({ value, options, onChange, disabled }: P
   const btnRef = useRef<HTMLButtonElement | null>(null);
 
   const selected = options.find((o) => o.userId === value);
-  const displayName = selected?.name || selected?.email?.split('@')[0] || "—";
+  const displayName = selected?.name || selected?.email?.split('@')[0] || "Unassigned";
+
+  // Use teal color for assigned users, slate for unassigned
+  const isAssigned = value !== null;
+  const colorClasses = isAssigned
+    ? "border-teal-200 bg-teal-50 text-teal-700 hover:shadow-sm dark:border-teal-500/30 dark:bg-teal-500/10 dark:text-teal-300"
+    : "border-slate-300 bg-white/70 text-slate-700 hover:shadow-sm dark:border-slate-700 dark:bg-transparent dark:text-white";
 
   return (
     <div className="flex items-center" onClick={(e) => e.stopPropagation()}>
@@ -29,18 +35,18 @@ export default function AssigneeSelect({ value, options, onChange, disabled }: P
         type="button"
         disabled={disabled}
         onClick={() => setOpen((v) => !v)}
-        className="flex items-center gap-1 rounded-lg border border-slate-300 bg-white px-2 py-1 text-xs text-slate-700 transition hover:border-slate-400 disabled:opacity-50 disabled:cursor-not-allowed dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200 dark:hover:border-slate-500"
+        className={`inline-flex items-center justify-center rounded-lg border text-[11px] font-medium transition cursor-pointer focus:outline-none focus:ring-2 focus:ring-offset-1 focus:ring-slate-300 dark:focus:ring-slate-600 disabled:opacity-50 disabled:cursor-not-allowed min-w-[110px] max-w-[110px] text-center px-2 py-0.5 ${colorClasses}`}
         title="Assign to user"
       >
-        <span className="truncate max-w-[90px]">{displayName}</span>
-        <ChevronDownIcon className="w-3 h-3 opacity-60" />
+        <span className="truncate">{displayName}</span>
+        <span className="ml-1 opacity-70">▾</span>
       </button>
 
       <DropdownPortal
         open={open}
         anchor={btnRef.current}
         onClose={() => setOpen(false)}
-        width={240}
+        width={280}
       >
         {/* Unassign option */}
         <MenuItem
@@ -51,24 +57,33 @@ export default function AssigneeSelect({ value, options, onChange, disabled }: P
             onChange(null);
           }}
         />
-        
+
         {/* Divider */}
         {options.length > 0 && (
           <div className="border-t border-slate-200 dark:border-slate-700 my-1" />
         )}
 
-        {/* User options */}
-        {options.map((opt) => (
-          <MenuItem
-            key={opt.userId}
-            active={value === opt.userId}
-            label={opt.name || opt.email}
-            onClick={() => {
-              setOpen(false);
-              onChange(opt.userId);
-            }}
-          />
-        ))}
+        {/* User options - scrollable if many */}
+        <div
+          className="max-h-[320px] overflow-y-auto pr-1"
+          style={{
+            scrollbarWidth: 'thin',
+            scrollbarColor: 'rgb(203 213 225) transparent'
+          }}
+        >
+          {options.map((opt) => (
+            <MenuItem
+              key={opt.userId}
+              active={value === opt.userId}
+              label={opt.name || opt.email}
+              subtitle={opt.email}
+              onClick={() => {
+                setOpen(false);
+                onChange(opt.userId);
+              }}
+            />
+          ))}
+        </div>
       </DropdownPortal>
     </div>
   );

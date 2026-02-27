@@ -44,7 +44,7 @@ export default function DropdownPortal({
     <div
       ref={panelRef}
       style={{ position: "fixed", left: pos.left, top: pos.top, width, zIndex: 50 }}
-      className="rounded-xl border border-slate-200 bg-white p-1 shadow-lg dark:border-slate-800 dark:bg-[#0f1524]"
+      className="rounded-xl border border-slate-200 bg-white p-1.5 shadow-xl dark:border-slate-700 dark:bg-[#0f1524]"
     >
       {children}
     </div>,
@@ -53,21 +53,30 @@ export default function DropdownPortal({
 }
 
 export function MenuItem({
-  active, label, onClick,
-}: { active?: boolean; label: string; onClick: () => void }) {
+  active, label, subtitle, onClick,
+}: { active?: boolean; label: string; subtitle?: string; onClick: () => void }) {
   return (
     <button
       type="button"
       onClick={onClick}
       className={[
-        "flex w-full items-center justify-between rounded-lg px-2 py-1.5 text-sm",
+        "flex w-full items-center justify-between rounded-lg px-3 py-2 text-left transition-colors",
         active
           ? "bg-slate-100 text-slate-900 dark:bg-slate-800 dark:text-white"
           : "hover:bg-slate-50 dark:hover:bg-slate-800/70",
       ].join(" ")}
     >
-      <span>{label}</span>
-      {active && <span className="text-xs opacity-70">✓</span>}
+      <div className="flex flex-col min-w-0 flex-1">
+        <span className="text-sm font-medium truncate">{label}</span>
+        {subtitle && (
+          <span className="text-xs text-slate-500 dark:text-slate-400 truncate">
+            {subtitle}
+          </span>
+        )}
+      </div>
+      {active && (
+        <span className="ml-2 text-emerald-600 dark:text-emerald-400 flex-shrink-0">✓</span>
+      )}
     </button>
   );
 }
