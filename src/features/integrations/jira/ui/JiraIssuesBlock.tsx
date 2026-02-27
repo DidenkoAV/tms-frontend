@@ -1,5 +1,5 @@
 // src/features/jira/components/JiraIssuesBlock.tsx
-import { useEffect, useState, useRef } from "react";
+import { useEffect, useState, useRef, Fragment } from "react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 
@@ -458,9 +458,8 @@ export default function JiraIssuesBlock({
             </thead>
             <tbody className="divide-y divide-slate-200 dark:divide-slate-800">
               {issues.map((iss) => (
-                <>
+                <Fragment key={iss.id}>
                   <tr
-                    key={iss.id}
                     className="transition hover:bg-slate-50 dark:hover:bg-slate-800/40"
                   >
                     <td className="px-3 py-2 text-center">
@@ -613,7 +612,7 @@ export default function JiraIssuesBlock({
                       </td>
                     </tr>
                   )}
-                </>
+                </Fragment>
               ))}
             </tbody>
           </table>

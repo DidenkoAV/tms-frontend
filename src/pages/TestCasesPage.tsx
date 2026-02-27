@@ -210,9 +210,10 @@ function TestCasesPageContent() {
       });
 
       // Load Jira issues for all cases in batch (if Jira column is visible)
-      if (cols.jira && casesRes.data.length > 0) {
+      // Use project's groupId, not projectId
+      if (cols.jira && casesRes.data.length > 0 && p.groupId) {
         const caseIds = casesRes.data.map(c => c.id);
-        await jiraBatch.loadBatch(projectId, caseIds);
+        await jiraBatch.loadBatch(p.groupId, caseIds);
       }
 
       // Increment version to force remount of CaseRow components

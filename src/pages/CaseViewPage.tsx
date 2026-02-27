@@ -10,6 +10,7 @@ import {
 
 // Entities (new structure)
 import { getCase, updateCase, listSuites } from "@/entities/test-case";
+import { listAllProjects } from "@/entities/project";
 import {
   TestCase,
   PriorityLabel,
@@ -61,8 +62,6 @@ export default function CaseViewPage() {
   const nav = useNavigate();
   const { me } = useMe();
 
-  const groupId = me?.currentGroupId ?? me?.groups?.[0]?.id ?? null;
-
   type BannerKind = "info" | "error" | "success" | "warning";
   const [banner, setBanner] = useState<{
     kind: BannerKind;
@@ -88,8 +87,12 @@ export default function CaseViewPage() {
 
   const [loading, setLoading] = useState(true);
   const [err, setErr] = useState<string | null>(null);
+  const [project, setProject] = useState<{ id: number; groupId: number } | null>(null);
   const [suites, setSuites] = useState<Suite[]>([]);
   const [item, setItem] = useState<TestCase | null>(null);
+
+  // Use project's groupId instead of user's current groupId
+  const groupId = project?.groupId ?? null;
 
   // inline edit states
   const [editPre, setEditPre] = useState(false);
@@ -158,11 +161,18 @@ export default function CaseViewPage() {
       setErr(null);
       setMetaReady(false);
       try {
-        const [suitesRes, caseRes] = await Promise.all([
+        const [allProjects, suitesRes, caseRes] = await Promise.all([
+          listAllProjects(),
           listSuites(projectId),
           getCase(viewId),
         ]);
         if (!alive) return;
+
+        // Find and set project to get groupId
+        const proj = allProjects.find((p) => p.id === projectId);
+        if (proj) {
+          setProject({ id: proj.id, groupId: proj.groupId });
+        }
 
         setSuites(suitesRes);
         setItem(caseRes);

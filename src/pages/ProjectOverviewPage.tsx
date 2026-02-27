@@ -339,7 +339,7 @@ export default function ProjectOverviewPage() {
       <div className="flex items-center justify-between mb-4">
         <div>
           <button onClick={() => nav("/projects")} className="mb-1 text-xs text-slate-500 hover:underline dark:text-slate-400">
-            ? Back to projects
+            ‚Üê Back to projects
           </button>
           <h1 className="text-2xl font-semibold">
           Project details
@@ -348,7 +348,7 @@ export default function ProjectOverviewPage() {
         {lastRun && (
           <div className="items-center hidden gap-2 sm:flex">
             <Pill>Last run: <b className="text-slate-800 dark:text-slate-100">{lastRun.name}</b></Pill>
-            <Pill>Pass rate: <b className="text-slate-800 dark:text-slate-100">{lastRunPassRate == null ? "ó" : Math.round(lastRunPassRate*100)+"%"}</b></Pill>
+            <Pill>Pass rate: <b className="text-slate-800 dark:text-slate-100">{lastRunPassRate == null ? "‚Äî" : Math.round(lastRunPassRate*100)+"%"}</b></Pill>
           </div>
         )}
       </div>
@@ -419,19 +419,24 @@ export default function ProjectOverviewPage() {
         )}
       </Card>
 
-      {/* ---- Project overview ---- */}
-      <Card className="mb-6">
-        <div className="mb-2 text-sm font-semibold tracking-wide uppercase text-slate-600 dark:text-slate-300">
-          Project overview
+      {/* ---- Project overview (Statistics - non-interactive) ---- */}
+      <Card className="mb-6 bg-gradient-to-br from-slate-50 to-slate-100/50 dark:from-slate-900/40 dark:to-slate-800/20">
+        <div className="mb-4 flex items-center gap-2">
+          <div className="text-sm font-semibold tracking-wide uppercase text-slate-600 dark:text-slate-300">
+            Project Statistics
+          </div>
+          <span className="text-xs text-slate-400 dark:text-slate-500">(read-only)</span>
         </div>
-        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
           {overview.map((it) => (
             <div
               key={it.label}
-              className="p-4 border rounded-xl border-slate-200 bg-slate-50 dark:border-slate-800 dark:bg-slate-900/40"
+              className="rounded-lg border border-slate-200/60 bg-white/60 p-4 dark:border-slate-700/40 dark:bg-slate-800/30"
             >
-              <div className="text-[12px] uppercase tracking-wide text-slate-500 dark:text-slate-400">{it.label}</div>
-              <div className="mt-1 text-3xl font-semibold text-slate-900 tabular-nums dark:text-slate-100">
+              <div className="text-[11px] font-medium uppercase tracking-wider text-slate-500 dark:text-slate-400">
+                {it.label}
+              </div>
+              <div className="mt-2 text-4xl font-bold text-slate-900 tabular-nums dark:text-slate-100">
                 {it.value}
               </div>
             </div>
@@ -439,16 +444,23 @@ export default function ProjectOverviewPage() {
         </div>
       </Card>
 
-      {/* ---- Panels ---- */}
+      {/* ---- Navigation Cards (Interactive - clickable) ---- */}
+      <div className="mb-3">
+        <div className="text-sm font-semibold tracking-wide uppercase text-slate-600 dark:text-slate-300">
+          üîó Quick Navigation
+        </div>
+      </div>
       <section className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
         {/* Test Cases */}
         <Link
           to={`/projects/${projectId}/test-cases`}
-          className="group rounded-2xl border border-slate-200 bg-white p-5 shadow-sm transition hover:-translate-y-0.5 hover:shadow-md hover:border-slate-300 dark:border-slate-800 dark:bg-[#0b1222] dark:hover:border-slate-700"
+          className="group relative overflow-hidden rounded-2xl border-2 border-slate-300 bg-white p-5 shadow-md transition-all duration-200 hover:-translate-y-1 hover:shadow-xl hover:border-slate-900 hover:bg-slate-50 dark:border-slate-700 dark:bg-[#0b1222] dark:hover:border-slate-100 dark:hover:bg-slate-800/50"
         >
           <div className="flex items-center justify-between mb-3">
-            <h3 className="text-xl font-semibold text-slate-900 dark:text-slate-100">Test Cases</h3>
-            <span className="inline-flex items-center gap-1 rounded-md border border-slate-300 bg-slate-50 px-2 py-0.5 text-[11px] text-slate-700 group-hover:border-slate-400 dark:border-slate-700 dark:bg-slate-900/50 dark:text-slate-300">
+            <h3 className="text-xl font-semibold text-slate-900 transition-colors group-hover:text-slate-950 dark:text-slate-100 dark:group-hover:text-white">
+              Test Cases
+            </h3>
+            <span className="inline-flex items-center gap-1 rounded-lg border border-slate-400 bg-slate-100 px-2.5 py-1 text-[11px] font-medium text-slate-700 transition-all group-hover:border-slate-900 group-hover:bg-slate-900 group-hover:text-white dark:border-slate-600 dark:bg-slate-800 dark:text-slate-300 dark:group-hover:border-slate-100 dark:group-hover:bg-slate-100 dark:group-hover:text-slate-900">
               <IconArrow /> Open
             </span>
           </div>
@@ -456,42 +468,52 @@ export default function ProjectOverviewPage() {
             <Pill>Suites: <b>{suitesCount}</b></Pill>
             <Pill>Cases: <b>{casesCount}</b></Pill>
           </div>
+          {/* Hover indicator */}
+          <div className="absolute bottom-0 left-0 h-0.5 w-0 bg-slate-900 transition-all duration-300 group-hover:w-full dark:bg-slate-100" />
         </Link>
 
         {/* Test Runs */}
         <Link
           to={`/projects/${projectId}/runs`}
-          className="group rounded-2xl border border-slate-200 bg-white p-5 shadow-sm transition hover:-translate-y-0.5 hover:shadow-md hover:border-slate-300 dark:border-slate-800 dark:bg-[#0b1222] dark:hover:border-slate-700"
+          className="group relative overflow-hidden rounded-2xl border-2 border-slate-300 bg-white p-5 shadow-md transition-all duration-200 hover:-translate-y-1 hover:shadow-xl hover:border-slate-900 hover:bg-slate-50 dark:border-slate-700 dark:bg-[#0b1222] dark:hover:border-slate-100 dark:hover:bg-slate-800/50"
         >
           <div className="flex items-center justify-between mb-3">
-            <h3 className="text-xl font-semibold text-slate-900 dark:text-slate-100">Test Runs</h3>
-            <span className="inline-flex items-center gap-1 rounded-md border border-slate-300 bg-slate-50 px-2 py-0.5 text-[11px] text-slate-700 group-hover:border-slate-400 dark:border-slate-700 dark:bg-slate-900/50 dark:text-slate-300">
+            <h3 className="text-xl font-semibold text-slate-900 transition-colors group-hover:text-slate-950 dark:text-slate-100 dark:group-hover:text-white">
+              Test Runs
+            </h3>
+            <span className="inline-flex items-center gap-1 rounded-lg border border-slate-400 bg-slate-100 px-2.5 py-1 text-[11px] font-medium text-slate-700 transition-all group-hover:border-slate-900 group-hover:bg-slate-900 group-hover:text-white dark:border-slate-600 dark:bg-slate-800 dark:text-slate-300 dark:group-hover:border-slate-100 dark:group-hover:bg-slate-100 dark:group-hover:text-slate-900">
               <IconArrow /> Open
             </span>
           </div>
           <div className="flex flex-wrap gap-3 text-sm text-slate-600 dark:text-slate-400">
             <Pill>Runs: <b>{runsCount}</b></Pill>
-            <Pill>Last: <b>{lastRun ? lastRun.name : "ó"}</b></Pill>
+            <Pill>Last: <b>{lastRun ? lastRun.name : "‚Äî"}</b></Pill>
           </div>
+          {/* Hover indicator */}
+          <div className="absolute bottom-0 left-0 h-0.5 w-0 bg-slate-900 transition-all duration-300 group-hover:w-full dark:bg-slate-100" />
         </Link>
 
         {/* Milestones */}
         <Link
           to={`/projects/${projectId}/milestones`}
-          className="group rounded-2xl border border-slate-200 bg-white p-5 shadow-sm transition hover:-translate-y-0.5 hover:shadow-md hover:border-slate-300 dark:border-slate-800 dark:bg-[#0b1222] dark:hover:border-slate-700"
+          className="group relative overflow-hidden rounded-2xl border-2 border-slate-300 bg-white p-5 shadow-md transition-all duration-200 hover:-translate-y-1 hover:shadow-xl hover:border-slate-900 hover:bg-slate-50 dark:border-slate-700 dark:bg-[#0b1222] dark:hover:border-slate-100 dark:hover:bg-slate-800/50"
         >
           <div className="flex items-center justify-between mb-3">
-            <h3 className="text-xl font-semibold text-slate-900 dark:text-slate-100">Milestones</h3>
-            <span className="inline-flex items-center gap-1 rounded-md border border-slate-300 bg-slate-50 px-2 py-0.5 text-[11px] text-slate-700 group-hover:border-slate-400 dark:border-slate-700 dark:bg-slate-900/50 dark:text-slate-300">
+            <h3 className="text-xl font-semibold text-slate-900 transition-colors group-hover:text-slate-950 dark:text-slate-100 dark:group-hover:text-white">
+              Milestones
+            </h3>
+            <span className="inline-flex items-center gap-1 rounded-lg border border-slate-400 bg-slate-100 px-2.5 py-1 text-[11px] font-medium text-slate-700 transition-all group-hover:border-slate-900 group-hover:bg-slate-900 group-hover:text-white dark:border-slate-600 dark:bg-slate-800 dark:text-slate-300 dark:group-hover:border-slate-100 dark:group-hover:bg-slate-100 dark:group-hover:text-slate-900">
               <IconArrow /> Open
             </span>
           </div>
           <div className="flex flex-wrap gap-3 text-sm text-slate-600 dark:text-slate-400">
             <Pill>Total: <b>{milestonesCount}</b></Pill>
             <Pill>
-              Next due: <b>{nextDue?.dueDate ? new Date(nextDue.dueDate).toLocaleDateString() : "ó"}</b>
+              Next due: <b>{nextDue?.dueDate ? new Date(nextDue.dueDate).toLocaleDateString() : "‚Äî"}</b>
             </Pill>
           </div>
+          {/* Hover indicator */}
+          <div className="absolute bottom-0 left-0 h-0.5 w-0 bg-slate-900 transition-all duration-300 group-hover:w-full dark:bg-slate-100" />
         </Link>
       </section>
     </div>
