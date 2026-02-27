@@ -79,8 +79,8 @@ const RUN_STATE_OPTIONS: StatusPickerOption[] = [
     id: 0,
     label: "Open",
     badge:
-      "text-emerald-700 bg-emerald-50 border border-emerald-200 hover:border-emerald-300 focus:ring-emerald-300 dark:text-emerald-200 dark:bg-emerald-900/40 dark:border-emerald-600",
-    dot: "bg-emerald-500 dark:bg-emerald-300",
+      "text-emerald-800 bg-emerald-100 border border-emerald-400 hover:border-emerald-500 focus:ring-emerald-400 dark:text-emerald-300 dark:bg-emerald-950/50 dark:border-emerald-800/60 dark:hover:border-emerald-700",
+    dot: "bg-emerald-600 dark:bg-emerald-500",
   },
   {
     id: 1,

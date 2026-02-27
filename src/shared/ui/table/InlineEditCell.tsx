@@ -39,12 +39,12 @@ export default function InlineEditCell({
   }, [isEditing]);
 
   if (!isEditing) {
-    const baseClasses = `block truncate font-medium ${fontSize} text-slate-900 dark:text-white`;
+    const baseClasses = `block truncate font-semibold ${fontSize} text-slate-800 dark:text-slate-50 tracking-[-0.01em] leading-snug`;
     if (onViewClick) {
       return (
         <button
           type="button"
-          className={`${baseClasses} text-left focus:outline-none hover:underline ${viewClassName}`}
+          className={`${baseClasses} text-left focus:outline-none hover:text-slate-900 dark:hover:text-white transition-colors ${viewClassName}`}
           title={value}
           onClick={(e) => {
             if (onClick) onClick(e);
