@@ -11,7 +11,12 @@ export default function JiraIssuesInline({ testCaseId }: Props) {
   const issues = getIssues(testCaseId);
 
   if (loading) {
-    return <span className="text-xs text-slate-400">Loading…</span>;
+    return (
+      <div className="inline-flex items-center gap-1.5">
+        <div className="w-3 h-3 border-2 border-slate-300 border-t-slate-600 rounded-full animate-spin dark:border-slate-700 dark:border-t-slate-400" />
+        <span className="text-xs text-slate-400">Loading…</span>
+      </div>
+    );
   }
 
   if (error === "no-connection") {

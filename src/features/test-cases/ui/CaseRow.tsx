@@ -150,7 +150,7 @@ export default function CaseRow({
               open={openPri}
               anchor={priRef.current}
               onClose={() => setOpenPri(false)}
-              width={220}
+              width={140}
             >
               {[
                 { id: 4, label: "Critical" },
@@ -186,7 +186,7 @@ export default function CaseRow({
               open={openType}
               anchor={typeRef.current}
               onClose={() => setOpenType(false)}
-              width={240}
+              width={160}
             >
               {[
                 { id: 1, label: "Functional" },
@@ -224,7 +224,7 @@ export default function CaseRow({
               open={openAuto}
               anchor={autoRef.current}
               onClose={() => setOpenAuto(false)}
-              width={220}
+              width={140}
             >
               {[
                 { key: "AUTOMATED", label: "Automated" },

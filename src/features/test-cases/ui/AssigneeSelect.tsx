@@ -47,12 +47,12 @@ export default function AssigneeSelect({ value, options, onChange, disabled }: P
         open={open}
         anchor={btnRef.current}
         onClose={() => setOpen(false)}
-        width={280}
+        width={160}
       >
         {/* Unassign option */}
         <MenuItem
           active={value === null}
-          label="— Unassigned —"
+          label="Unassigned"
           onClick={() => {
             setOpen(false);
             onChange(null);
@@ -66,7 +66,7 @@ export default function AssigneeSelect({ value, options, onChange, disabled }: P
 
         {/* User options - scrollable if many */}
         <div
-          className="max-h-[320px] overflow-y-auto pr-1"
+          className="max-h-[60px] overflow-y-auto pr-1"
           style={{
             scrollbarWidth: 'thin',
             scrollbarColor: 'rgb(203 213 225) transparent'
@@ -77,7 +77,6 @@ export default function AssigneeSelect({ value, options, onChange, disabled }: P
               key={opt.userId}
               active={value === opt.userId}
               label={opt.name || opt.email}
-              subtitle={opt.email}
               onClick={() => {
                 setOpen(false);
                 onChange(opt.userId);

@@ -95,7 +95,7 @@ function TypeControl({
         open={open}
         anchor={ref.current}
         onClose={() => setOpen(false)}
-        width={220}
+        width={160}
       >
         {TYPE_OPTIONS.map((opt) => (
           <MenuItem
@@ -139,7 +139,7 @@ function PriorityControl({
         open={open}
         anchor={ref.current}
         onClose={() => setOpen(false)}
-        width={220}
+        width={140}
       >
         {PRIORITY_OPTIONS.map((opt) => (
           <MenuItem
@@ -183,7 +183,7 @@ function AutomationControl({
         open={open}
         anchor={ref.current}
         onClose={() => setOpen(false)}
-        width={220}
+        width={140}
       >
         {AUTOMATION_OPTIONS.map((opt) => (
           <MenuItem

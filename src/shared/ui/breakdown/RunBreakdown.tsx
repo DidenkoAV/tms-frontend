@@ -73,59 +73,74 @@ export function RunBreakdown({
 
   if (loading && !ready) {
     return (
-      <div className="flex items-center w-full gap-2">
-        <div className="relative flex-1 h-3.5 overflow-hidden rounded-full bg-slate-100 dark:bg-slate-800">
+      <div className="flex items-center w-full gap-3">
+        <div className="relative flex-1 h-6 overflow-hidden rounded-lg bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700">
           <div className="absolute inset-0 animate-pulse bg-slate-200/80 dark:bg-slate-700/60" />
         </div>
-        <span className="text-xs font-medium tracking-tight text-slate-400 dark:text-slate-500">
-          …
+        <span className="text-sm font-medium tracking-tight text-slate-400 dark:text-slate-500 min-w-[60px] text-right">
+          Loading…
         </span>
       </div>
     );
   }
 
   return (
-    <div className="flex w-full flex-col gap-1.5">
-      <div className="relative flex h-2 overflow-hidden rounded-sm bg-slate-200 dark:bg-slate-700/50">
+    <div className="flex w-full flex-col gap-2">
+      {/* Progress bar */}
+      <div className="relative flex h-6 overflow-hidden rounded-lg bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 shadow-sm">
         {segments.length === 0 ? (
-          <div className="absolute inset-0 grid text-[10px] text-slate-500 dark:text-slate-400 place-items-center">
+          <div className="absolute inset-0 grid text-xs font-medium text-slate-500 dark:text-slate-400 place-items-center">
             No data
           </div>
         ) : (
-          segments.map(({ key, value }) => {
-            const width = ready ? (value / denom) * 100 : 0;
-            return (
-              <div
-                key={key}
-                className={`h-full transition-[width] duration-500 ease-out ${STATUS_CLASSES[key]}`}
-                style={{
-                  width: `${width}%`,
-                  minWidth: ready && value > 0 ? 4 : 0,
-                }}
-                aria-label={`${key.toLowerCase()} ${value}`}
-              />
-            );
-          })
+          <>
+            {segments.map(({ key, value }) => {
+              const width = ready ? (value / denom) * 100 : 0;
+              return (
+                <div
+                  key={key}
+                  className={`h-full transition-[width] duration-500 ease-out ${STATUS_CLASSES[key]}`}
+                  style={{
+                    width: `${width}%`,
+                    minWidth: ready && value > 0 ? 6 : 0,
+                  }}
+                  title={`${key}: ${value} (${Math.round((value / denom) * 100)}%)`}
+                  aria-label={`${key.toLowerCase()} ${value}`}
+                />
+              );
+            })}
+            {/* Pass rate overlay */}
+            <div className="absolute inset-0 flex items-center justify-end px-2 pointer-events-none">
+              <span className="text-xs font-bold text-white drop-shadow-[0_1px_2px_rgba(0,0,0,0.8)] tabular-nums">
+                {pctPassed}% PASS
+              </span>
+            </div>
+          </>
         )}
       </div>
-      <div className="flex items-center justify-between text-[10px] font-semibold uppercase tracking-[0.28em] text-slate-400 dark:text-white/80">
-        <div className="flex gap-2 text-slate-500 dark:text-white/80">
-          {segments.slice(0, 3).map(({ key, value }) => (
+
+      {/* Legend */}
+      <div className="flex items-center gap-3 text-[11px] font-medium">
+        {segments.map(({ key, value }) => {
+          const pct = Math.round((value / denom) * 100);
+          return (
             <span
               key={key}
-              className="flex items-center gap-1 text-slate-500 dark:text-white/80"
+              className="flex items-center gap-1.5 text-slate-600 dark:text-slate-300"
             >
-              <span className={`h-1.5 w-1.5 rounded-full ${STATUS_DOTS[key]}`} />
-              {Math.round((value / denom) * 100)}%
+              <span className={`h-2 w-2 rounded-sm ${STATUS_DOTS[key]} shadow-sm`} />
+              <span className="capitalize">{key.toLowerCase()}</span>
+              <span className="text-slate-500 dark:text-slate-400 tabular-nums">
+                {value} ({pct}%)
+              </span>
             </span>
-          ))}
-        </div>
-        <span className="text-slate-500 dark:text-white">
-          PASS&nbsp;
-          <span className="text-slate-800 dark:text-white tabular-nums">
-            {pctPassed}%
+          );
+        })}
+        {segments.length === 0 && (
+          <span className="text-slate-400 dark:text-slate-500">
+            No test results yet
           </span>
-        </span>
+        )}
       </div>
     </div>
   );

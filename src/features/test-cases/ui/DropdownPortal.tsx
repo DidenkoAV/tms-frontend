@@ -44,7 +44,7 @@ export default function DropdownPortal({
     <div
       ref={panelRef}
       style={{ position: "fixed", left: pos.left, top: pos.top, width, zIndex: 50 }}
-      className="rounded-xl border border-slate-200 bg-white p-1.5 shadow-xl dark:border-slate-700 dark:bg-[#0f1524]"
+      className="rounded-xl border border-slate-200 bg-white p-1 shadow-xl dark:border-slate-700 dark:bg-[#0f1524]"
     >
       {children}
     </div>,
@@ -60,22 +60,22 @@ export function MenuItem({
       type="button"
       onClick={onClick}
       className={[
-        "flex w-full items-center justify-between rounded-lg px-3 py-2 text-left transition-colors",
+        "flex w-full items-center justify-between rounded-md px-2 py-1 text-left transition-colors",
         active
           ? "bg-slate-100 text-slate-900 dark:bg-slate-800 dark:text-white"
           : "hover:bg-slate-50 dark:hover:bg-slate-800/70",
       ].join(" ")}
     >
       <div className="flex flex-col min-w-0 flex-1">
-        <span className="text-sm font-medium truncate">{label}</span>
+        <span className="text-xs font-medium truncate">{label}</span>
         {subtitle && (
-          <span className="text-xs text-slate-500 dark:text-slate-400 truncate">
+          <span className="text-[10px] text-slate-500 dark:text-slate-400 truncate">
             {subtitle}
           </span>
         )}
       </div>
       {active && (
-        <span className="ml-2 text-emerald-600 dark:text-emerald-400 flex-shrink-0">✓</span>
+        <span className="ml-1.5 text-emerald-600 dark:text-emerald-400 flex-shrink-0 text-xs">✓</span>
       )}
     </button>
   );
