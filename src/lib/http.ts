@@ -58,7 +58,7 @@ http.interceptors.response.use(
         "/forgot-password",
         "/reset-password",
         "/confirm-email",
-        "/invite/accept"
+        "/invite/accepted"
       ];
       if (!publicPaths.includes(currentPath)) {
         setAuthToken(null);

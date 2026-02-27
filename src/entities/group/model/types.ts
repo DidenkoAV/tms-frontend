@@ -25,16 +25,17 @@ export type TokenItem = {
 export type TabKey = "profile" | "password" | "tokens" | "integrations" | "groups";
 
 /***** Groups *****/
-export type GroupRole = "OWNER" | "MAINTAINER" | "MEMBER";
+export type GroupRole = "OWNER" | "ADMIN" | "MEMBER";
 export type MembershipStatus = "ACTIVE" | "PENDING" | "REMOVED";
+export type GroupType = "PERSONAL" | "SHARED";
 
 export interface GroupSummary {
   id: number;
   name: string;
-  personal: boolean;
+  groupType: GroupType;
   ownerId: number;
   ownerEmail: string;
-  membersCount: number;
+  membersCount?: number;
 }
 
 export interface GroupMember {

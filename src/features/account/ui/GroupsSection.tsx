@@ -1,7 +1,20 @@
 // src/features/account/component/groups/GroupsSection.tsx
 import { useEffect, useMemo, useState } from "react";
 import { http } from "@/lib/http";
-import type { GroupDetails, GroupMember, GroupRole } from "@/entities/group";
+import type { GroupDetails, GroupMember, GroupRole, GroupType } from "@/entities/group";
+import {
+  listMyGroups,
+  getGroup,
+  createGroup,
+  renameGroup as apiRenameGroup,
+  deleteGroup,
+  inviteMember,
+  getPendingInvites,
+  cancelInvite as apiCancelInvite,
+  changeMemberRole,
+  removeMember as apiRemoveMember,
+  leaveGroup as apiLeaveGroup,
+} from "@/entities/group/api/groupApi";
 
 type Props = {
   CardHeader: React.FC<{ title: string; subtitle?: string; compact?: boolean }>;
@@ -25,6 +38,10 @@ export default function GroupsSection({
   const [groups, setGroups] = useState<GroupDetails[]>([]);
   const [selectedId, setSelectedId] = useState<number | null>(null);
 
+  // create group
+  const [creatingGroup, setCreatingGroup] = useState(false);
+  const [newGroupName, setNewGroupName] = useState("");
+
   // invite
   const [inviteEmail, setInviteEmail] = useState("");
 
@@ -35,10 +52,29 @@ export default function GroupsSection({
   // me
   const [myEmail, setMyEmail] = useState<string | null>(null);
 
+  // toast notifications
+  const [toast, setToast] = useState<{ message: string; type: "success" | "error" } | null>(null);
+
+  // Show toast helper
+  const showToast = (message: string, type: "success" | "error" = "success") => {
+    setToast({ message, type });
+    setTimeout(() => setToast(null), 4000);
+  };
+
   const selected = useMemo<GroupDetails | null>(() => {
     const byId = groups.find((g) => g.id === selectedId) || null;
     return byId ?? groups[0] ?? null;
   }, [groups, selectedId]);
+
+  // Helper to get display name for personal groups
+  const getGroupDisplayName = (g: GroupDetails) => {
+    if (g.groupType === "PERSONAL") {
+      // Extract name from owner email or use full name if available
+      const ownerName = g.ownerEmail.split('@')[0];
+      return `Personal — ${ownerName}`;
+    }
+    return g.name;
+  };
 
   /* ---------- Load me & groups ---------- */
   useEffect(() => {
@@ -46,23 +82,22 @@ export default function GroupsSection({
     setLoading(true);
     setError(null);
 
-    Promise.all([http.get("/api/auth/me"), http.get("/api/groups/my")])
-      .then(async ([meRes, groupsRes]) => {
+    Promise.all([http.get("/api/auth/me"), listMyGroups()])
+      .then(async ([meRes, groupsList]) => {
         if (!alive) return;
 
         const me = meRes?.data;
         setMyEmail((me?.email || "").toLowerCase());
 
-        const list = Array.isArray(groupsRes.data) ? (groupsRes.data as GroupDetails[]) : [];
-        setGroups(list);
+        setGroups(groupsList);
 
-        const first = list[0];
+        const first = groupsList[0];
         if (first) {
           setSelectedId((prev) => prev ?? first.id);
           setRenameValue(first.name);
           try {
-            const { data } = await http.get(`/api/groups/${first.id}`);
-            setGroups((prev) => prev.map((g) => (g.id === first.id ? (data as GroupDetails) : g)));
+            const details = await getGroup(first.id);
+            setGroups((prev) => prev.map((g) => (g.id === first.id ? details : g)));
           } catch {
             /* no-op */
           }
@@ -86,20 +121,36 @@ export default function GroupsSection({
     const me = (g.members ?? []).find((m) => (m.email || "").toLowerCase() === myEmail);
     return (me?.role as GroupRole) ?? null;
   };
-  const isMyPersonal = (g: GroupDetails | null) =>
-    !!g && !!g.personal && myEmail && (g.ownerEmail || "").toLowerCase() === myEmail;
 
   const isOwner = (g: GroupDetails | null) => myRoleIn(g) === "OWNER";
-  const isMaintainer = (g: GroupDetails | null) => myRoleIn(g) === "MAINTAINER";
+  const isAdmin = (g: GroupDetails | null) => myRoleIn(g) === "ADMIN";
 
   // policy
-  const canRename = (g: GroupDetails | null) => isOwner(g) || isMaintainer(g); // OWNER + MAINTAINER
-  const canManageMembers = (g: GroupDetails | null) => isOwner(g); // OWNER only
+  const canRename = (g: GroupDetails | null) => g?.groupType === "SHARED" && (isOwner(g) || isAdmin(g));
+  const canDelete = (g: GroupDetails | null) => g?.groupType === "SHARED" && isOwner(g);
+  const canInvite = (g: GroupDetails | null) => isOwner(g) || isAdmin(g); // ← Теперь можно приглашать в любой тип группы
+  const canManageMembers = (g: GroupDetails | null) => isOwner(g) || isAdmin(g); // ← Теперь можно управлять в любом типе
 
   /* ---------- Actions ---------- */
   const refreshGroup = async (groupId: number) => {
-    const { data } = await http.get(`/api/groups/${groupId}`);
-    setGroups((prev) => prev.map((g) => (g.id === groupId ? (data as GroupDetails) : g)));
+    const details = await getGroup(groupId);
+    setGroups((prev) => prev.map((g) => (g.id === groupId ? details : g)));
+  };
+
+  const handleCreateGroup = async () => {
+    const name = (newGroupName || "").trim();
+    if (!name) return;
+    try {
+      const newGroup = await createGroup(name);
+      setGroups((prev) => [...prev, newGroup]);
+      setSelectedId(newGroup.id);
+      setRenameValue(newGroup.name);
+      setNewGroupName("");
+      setCreatingGroup(false);
+      showToast(`Group "${newGroup.name}" created successfully!`);
+    } catch (e: any) {
+      showToast(e?.response?.data?.message || "Failed to create group", "error");
+    }
   };
 
   const invite = async (g: GroupDetails | null) => {
@@ -107,36 +158,27 @@ export default function GroupsSection({
     const email = (inviteEmail || "").trim().toLowerCase();
     if (!email) return;
     try {
-      await http.post(`/api/groups/${g.id}/members`, { email });
+      await inviteMember(g.id, email);
       setInviteEmail("");
       await refreshGroup(g.id);
-      alert("Invitation sent (or refreshed).");
+      showToast(`Invitation sent to ${email}`);
     } catch (e: any) {
-      alert(e?.response?.data?.message || "Failed to invite");
+      showToast(e?.response?.data?.message || "Failed to invite", "error");
     }
   };
 
-  const resendInvite = async (g: GroupDetails, m: GroupMember) => {
-    try {
-      await http.post(`/api/groups/${g.id}/invites/resend`, { email: m.email });
-      await refreshGroup(g.id);
-      alert("Invitation re-sent.");
-    } catch (e: any) {
-      alert(e?.response?.data?.message || "Failed to resend");
-    }
-  };
-
-  const cancelInvite = async (g: GroupDetails, m: GroupMember) => {
+  const handleCancelInvite = async (g: GroupDetails, m: GroupMember) => {
     if (!confirm(`Cancel invite for ${m.email}?`)) return;
     try {
-      await http.delete(`/api/groups/${g.id}/invites/${m.id}`);
+      await apiCancelInvite(g.id, m.id);
       await refreshGroup(g.id);
+      showToast(`Invite for ${m.email} cancelled`);
     } catch (e: any) {
-      alert(e?.response?.data?.message || "Failed to cancel invite");
+      showToast(e?.response?.data?.message || "Failed to cancel invite", "error");
     }
   };
 
-  const renameGroup = async (g: GroupDetails | null) => {
+  const handleRenameGroup = async (g: GroupDetails | null) => {
     if (!g || !canRename(g)) return;
     const next = (renameValue || "").trim();
     if (!next || next === g.name) {
@@ -144,44 +186,63 @@ export default function GroupsSection({
       return;
     }
     try {
-      await http.patch(`/api/groups/${g.id}`, { name: next });
+      await apiRenameGroup(g.id, next);
       await refreshGroup(g.id);
       setEditingName(false);
+      showToast(`Group renamed to "${next}"`);
     } catch (e: any) {
-      alert(e?.response?.data?.message || "Failed to rename group");
+      showToast(e?.response?.data?.message || "Failed to rename group", "error");
     }
   };
 
-  const removeMember = async (g: GroupDetails, m: GroupMember) => {
-    if (!confirm(`Remove ${m.email} from "${g.name}"?`)) return;
+  const handleDeleteGroup = async (g: GroupDetails) => {
+    if (!confirm(`Delete group "${g.name}"? This action cannot be undone.`)) return;
     try {
-      await http.delete(`/api/groups/${g.id}/members/${m.id}`);
-      await refreshGroup(g.id);
-    } catch (e: any) {
-      alert(e?.response?.data?.message || "Failed to remove member");
-    }
-  };
-
-  const changeRole = async (g: GroupDetails, m: GroupMember, role: GroupRole) => {
-    try {
-      await http.patch(`/api/groups/${g.id}/members/${m.id}`, { role });
-      await refreshGroup(g.id);
-    } catch (e: any) {
-      alert(e?.response?.data?.message || "Failed to change role");
-    }
-  };
-
-  const leaveGroup = async (g: GroupDetails) => {
-    if (!confirm(`Leave group "${g.name}"?`)) return;
-    try {
-      await http.post(`/api/groups/${g.id}/leave`);
+      await deleteGroup(g.id);
       setGroups((prev) => prev.filter((x) => x.id !== g.id));
       setSelectedId((prev) => {
         const next = groups.find((x) => x.id !== g.id)?.id;
         return next ?? null;
       });
+      showToast(`Group "${g.name}" deleted`);
     } catch (e: any) {
-      alert(e?.response?.data?.message || "Failed to leave group");
+      showToast(e?.response?.data?.message || "Failed to delete group", "error");
+    }
+  };
+
+  const handleRemoveMember = async (g: GroupDetails, m: GroupMember) => {
+    if (!confirm(`Remove ${m.email} from "${g.name}"?`)) return;
+    try {
+      await apiRemoveMember(g.id, m.id);
+      await refreshGroup(g.id);
+      showToast(`${m.email} removed from group`);
+    } catch (e: any) {
+      showToast(e?.response?.data?.message || "Failed to remove member", "error");
+    }
+  };
+
+  const changeRole = async (g: GroupDetails, m: GroupMember, role: GroupRole) => {
+    try {
+      await changeMemberRole(g.id, m.id, role);
+      await refreshGroup(g.id);
+      showToast(`Role changed to ${role}`);
+    } catch (e: any) {
+      showToast(e?.response?.data?.message || "Failed to change role", "error");
+    }
+  };
+
+  const handleLeaveGroup = async (g: GroupDetails) => {
+    if (!confirm(`Leave group "${g.name}"?`)) return;
+    try {
+      await apiLeaveGroup(g.id);
+      setGroups((prev) => prev.filter((x) => x.id !== g.id));
+      setSelectedId((prev) => {
+        const next = groups.find((x) => x.id !== g.id)?.id;
+        return next ?? null;
+      });
+      showToast(`You left group "${g.name}"`);
+    } catch (e: any) {
+      showToast(e?.response?.data?.message || "Failed to leave group", "error");
     }
   };
 
@@ -193,10 +254,10 @@ export default function GroupsSection({
           OWNER
         </span>
       );
-    if (role === "MAINTAINER")
+    if (role === "ADMIN")
       return (
         <span className="inline-flex items-center gap-1 rounded bg-violet-100 px-2 py-0.5 text-[11px] font-semibold text-violet-800 dark:bg-violet-500/15 dark:text-violet-200">
-          MAINTAINER
+          ADMIN
         </span>
       );
     return (
@@ -247,23 +308,70 @@ export default function GroupsSection({
   }
 
   return (
-    <div className="space-y-6">
-      <CardHeader
-        title="Groups"
-        subtitle="Your account has one personal group (created automatically). You can invite members and manage roles according to your permissions."
-      />
+    <div className="space-y-4">
+      <div className="flex items-center justify-between">
+        <CardHeader
+          title="Groups"
+          subtitle="Manage your personal and shared groups"
+          compact
+        />
+        <button
+          onClick={() => setCreatingGroup(true)}
+          className="rounded-md border border-slate-300 bg-white px-3 py-1.5 text-sm font-medium text-slate-700 hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200 dark:hover:bg-slate-800"
+        >
+          Create Group
+        </button>
+      </div>
 
-      <div className="grid gap-4 md:grid-cols-[16rem_1fr]">
+      {/* Create Group Modal */}
+      {creatingGroup && (
+        <div className="rounded-lg border border-slate-200 bg-slate-50 p-3 dark:border-slate-800 dark:bg-slate-900/40">
+          <div className="mb-2 text-sm font-medium">Create New Group</div>
+          <div className="flex items-center gap-2">
+            <Input
+              value={newGroupName}
+              onChange={(e) => setNewGroupName(e.target.value)}
+              placeholder="Group name"
+              autoFocus
+              onKeyDown={(e) => {
+                if (e.key === "Enter") {
+                  e.preventDefault();
+                  handleCreateGroup();
+                }
+                if (e.key === "Escape") {
+                  e.preventDefault();
+                  setCreatingGroup(false);
+                  setNewGroupName("");
+                }
+              }}
+              className="flex-1"
+            />
+            <ButtonPrimary onClick={handleCreateGroup}>Create</ButtonPrimary>
+            <button
+              className="rounded-md border border-slate-300 bg-white px-3 py-1.5 text-sm hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-900"
+              onClick={() => {
+                setCreatingGroup(false);
+                setNewGroupName("");
+              }}
+            >
+              Cancel
+            </button>
+          </div>
+        </div>
+      )}
+
+      <div className="grid gap-4 md:grid-cols-[14rem_1fr]">
         {/* list */}
         <div className="rounded-lg border border-slate-200 p-2 dark:border-slate-800">
           <ul className="space-y-1">
             {groups.map((g) => {
               const active = g.id === selectedId;
+              const isPersonal = g.groupType === "PERSONAL";
               return (
                 <li key={g.id}>
                   <button
                     className={[
-                      "w-full rounded-md px-3 py-2 text-left text-sm transition",
+                      "w-full rounded-md px-2 py-1.5 text-left text-sm transition",
                       active ? "bg-slate-100 dark:bg-slate-800/40" : "hover:bg-slate-50 dark:hover:bg-slate-800/40",
                     ].join(" ")}
                     onClick={async () => {
@@ -274,19 +382,19 @@ export default function GroupsSection({
                     }}
                   >
                     <div className="flex items-center justify-between gap-2">
-                      <div>
-                        <div className="font-medium">
-                          {g.name}{" "}
-                          {isMyPersonal(g) && (
-                            <span className="ml-1 text-[10px] opacity-60">(personal)</span>
+                      <div className="min-w-0 flex-1">
+                        <div className="truncate font-medium text-[13px]">
+                          {getGroupDisplayName(g)}
+                        </div>
+                        <div className="flex items-center gap-1.5 text-[11px] text-slate-500 dark:text-slate-400">
+                          {isPersonal ? (
+                            <span className="rounded bg-slate-200 px-1 py-0.5 text-[10px] dark:bg-slate-700">Personal</span>
+                          ) : (
+                            <span className="rounded bg-indigo-100 px-1 py-0.5 text-[10px] text-indigo-700 dark:bg-indigo-500/20 dark:text-indigo-300">Shared</span>
                           )}
+                          <span>•</span>
+                          <span>{g.members?.length ?? 0}</span>
                         </div>
-                        <div className="text-xs text-slate-500 dark:text-slate-400">
-                          {g.membersCount} members • owner: {g.ownerEmail}
-                        </div>
-                      </div>
-                      <div className="text-[10px] rounded bg-slate-200/60 px-1.5 py-0.5 dark:bg-slate-700/60">
-                        #{g.id}
                       </div>
                     </div>
                   </button>
@@ -298,106 +406,120 @@ export default function GroupsSection({
         </div>
 
         {/* details */}
-        <div className="rounded-lg border border-slate-200 p-4 dark:border-slate-800">
+        <div className="rounded-lg border border-slate-200 p-3 dark:border-slate-800">
           {!selected ? (
             <div className="text-sm text-slate-500">Select a group…</div>
           ) : (
             <>
-              {/* --- Pretty title + inline rename --- */}
-              <div className="mb-4">
-                {!editingName ? (
-                  <div className="flex flex-wrap items-center gap-2">
-                    <h2
-                      className={
-                        canRename(selected)
-                          ? "text-2xl font-semibold tracking-tight cursor-text hover:underline underline-offset-4"
-                          : "text-2xl font-semibold tracking-tight"
-                      }
-                      title={canRename(selected) ? "Click to rename" : undefined}
-                      onClick={() => {
-                        if (!canRename(selected)) return;
-                        setEditingName(true);
-                        setRenameValue(selected.name);
-                      }}
-                    >
-                      {selected.name}
-                    </h2>
-                    {isMyPersonal(selected) && (
-                      <span className="rounded bg-slate-100 px-2 py-0.5 text-xs text-slate-700 dark:bg-slate-700/30 dark:text-slate-200">
-                        personal
-                      </span>
-                    )}
-                    {canRename(selected) && (
-                      <span className="text-xs text-slate-500 dark:text-slate-400 ml-1">
-                        (click name to edit)
-                      </span>
-                    )}
-                  </div>
-                ) : (
-                  <div className="flex flex-wrap items-center gap-2">
-                    <Input
-                      value={renameValue}
-                      onChange={(e) => setRenameValue(e.target.value)}
-                      autoFocus
-                      onKeyDown={(e) => {
-                        if (e.key === "Enter") {
-                          e.preventDefault();
-                          renameGroup(selected);
+              {/* --- Header with title, type badge, and actions --- */}
+              <div className="mb-3 flex items-start justify-between gap-3">
+                <div className="flex-1">
+                  {!editingName ? (
+                    <div className="flex items-center gap-2">
+                      <h2
+                        className={
+                          canRename(selected)
+                            ? "text-xl font-semibold cursor-text hover:underline underline-offset-2"
+                            : "text-xl font-semibold"
                         }
-                        if (e.key === "Escape") {
-                          e.preventDefault();
+                        title={canRename(selected) ? "Click to rename" : undefined}
+                        onClick={() => {
+                          if (!canRename(selected)) return;
+                          setEditingName(true);
+                          setRenameValue(selected.name);
+                        }}
+                      >
+                        {getGroupDisplayName(selected)}
+                      </h2>
+                      {selected.groupType === "PERSONAL" ? (
+                        <span className="rounded bg-slate-200 px-2 py-0.5 text-[11px] font-medium text-slate-700 dark:bg-slate-700 dark:text-slate-300">
+                          Personal
+                        </span>
+                      ) : (
+                        <span className="rounded bg-indigo-100 px-2 py-0.5 text-[11px] font-medium text-indigo-700 dark:bg-indigo-500/20 dark:text-indigo-300">
+                          Shared
+                        </span>
+                      )}
+                    </div>
+                  ) : (
+                    <div className="flex items-center gap-2">
+                      <Input
+                        value={renameValue}
+                        onChange={(e) => setRenameValue(e.target.value)}
+                        autoFocus
+                        onKeyDown={(e) => {
+                          if (e.key === "Enter") {
+                            e.preventDefault();
+                            handleRenameGroup(selected);
+                          }
+                          if (e.key === "Escape") {
+                            e.preventDefault();
+                            setEditingName(false);
+                            setRenameValue(selected.name);
+                          }
+                        }}
+                        className="flex-1"
+                      />
+                      <ButtonPrimary onClick={() => handleRenameGroup(selected)}>Save</ButtonPrimary>
+                      <button
+                        className="rounded-md border border-slate-300 bg-white px-2 py-1 text-sm hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-900"
+                        onClick={() => {
                           setEditingName(false);
                           setRenameValue(selected.name);
-                        }
-                      }}
-                    />
-                    <ButtonPrimary onClick={() => renameGroup(selected)}>Save</ButtonPrimary>
-                    <button
-                      className="rounded-md border border-slate-300 bg-white px-3 py-1.5 text-sm hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-900"
-                      onClick={() => {
-                        setEditingName(false);
-                        setRenameValue(selected.name);
-                      }}
-                    >
-                      Cancel
-                    </button>
+                        }}
+                      >
+                        Cancel
+                      </button>
+                    </div>
+                  )}
+                  <div className="mt-1 text-[12px] text-slate-500 dark:text-slate-400">
+                    Owner: {selected.ownerEmail}
                   </div>
+                </div>
+
+                {/* Delete button for SHARED groups */}
+                {canDelete(selected) && (
+                  <button
+                    onClick={() => handleDeleteGroup(selected)}
+                    className="rounded-md border border-rose-300 bg-rose-50 px-2 py-1 text-xs font-medium text-rose-700 hover:bg-rose-100 dark:border-rose-800 dark:bg-rose-900/20 dark:text-rose-300 dark:hover:bg-rose-900/40"
+                  >
+                    Delete Group
+                  </button>
                 )}
               </div>
 
-              {/* invite — only who can manage members (OWNER) */}
-              {canManageMembers(selected) && (
-                <div className="mb-4">
-                  <Field label="Invite member by email">
-                    <div className="flex items-center gap-2">
-                      <Input
-                        value={inviteEmail}
-                        onChange={(e) => setInviteEmail(e.target.value)}
-                        placeholder="user@example.com"
-                        className="flex-1"
-                      />
-                      <button
-                        onClick={() => invite(selected!)}
-                        className="rounded-md border border-slate-300 bg-slate-100 px-3 py-1.5 text-xs font-medium text-slate-700 transition hover:bg-slate-200 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200 dark:hover:bg-slate-700"
-                      >
-                        Invite
-                      </button>
-                    </div>
-                  </Field>
+              {/* invite — available for both PERSONAL and SHARED groups */}
+              {canInvite(selected) && (
+                <div className="mb-3">
+                  <div className="mb-1 text-[13px] font-medium">Invite Member</div>
+                  <div className="flex items-center gap-2">
+                    <Input
+                      value={inviteEmail}
+                      onChange={(e) => setInviteEmail(e.target.value)}
+                      placeholder="user@example.com"
+                      className="flex-1"
+                    />
+                    <button
+                      onClick={() => invite(selected!)}
+                      className="rounded-md border border-slate-300 bg-white px-3 py-1.5 text-xs font-medium text-slate-700 hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200 dark:hover:bg-slate-800"
+                    >
+                      Invite
+                    </button>
+                  </div>
                 </div>
               )}
 
               {/* members */}
               <div>
-                <div className="mb-2 text-sm font-medium">Members</div>
+                <div className="mb-2 text-[13px] font-medium">Members ({selected.members?.length ?? 0})</div>
                 <div className="overflow-x-auto rounded-md border border-slate-200 dark:border-slate-800">
-                  <table className="w-full text-sm">
+                  <table className="w-full text-[13px]">
                     <thead className="bg-slate-50 text-slate-600 dark:bg-slate-800/40 dark:text-slate-300">
                       <tr>
-                        <th className="px-3 py-2 text-left font-semibold">User</th>
-                        <th className="px-3 py-2 text-left font-semibold">Role</th>
-                        <th className="px-3 py-2 text-left font-semibold">Status</th>
-                        <th className="px-3 py-2 text-right font-semibold">Actions</th>
+                        <th className="px-2 py-1.5 text-left font-semibold">User</th>
+                        <th className="px-2 py-1.5 text-left font-semibold">Role</th>
+                        <th className="px-2 py-1.5 text-left font-semibold">Status</th>
+                        {canManageMembers(selected) && <th className="px-2 py-1.5 text-right font-semibold">Actions</th>}
                       </tr>
                     </thead>
                     <tbody>
@@ -407,92 +529,65 @@ export default function GroupsSection({
 
                         return (
                           <tr key={m.id} className="border-t border-slate-200 dark:border-slate-800">
-                            <td className="px-3 py-2">
-                              <div className="font-medium">{m.fullName || m.email}</div>
-                              <div className="text-xs text-slate-500">{m.email}</div>
+                            <td className="px-2 py-1.5">
+                              <div className="font-medium text-[13px]">{m.fullName || m.email}</div>
+                              <div className="text-[11px] text-slate-500">{m.email}</div>
                             </td>
 
-                            {/* Role: pretty dropdown for allowed cases; otherwise a badge */}
-                            <td className="px-3 py-2">
+                            {/* Role: dropdown for SHARED groups with permissions */}
+                            <td className="px-2 py-1.5">
                               {canManageMembers(selected) && isActive && !isOwnerRow ? (
-                                <div className="relative inline-block">
-                                  <select
-                                    className="
-                                      appearance-none pr-8
-                                      rounded-2xl border px-3 py-1.5 text-xs font-semibold tracking-wide
-                                      border-slate-400/50 bg-slate-100/20 text-slate-900
-                                      hover:bg-slate-100/30 hover:border-slate-300/60
-                                      focus:outline-none focus:ring-2 focus:ring-sky-400/30
-                                      dark:text-slate-100 dark:border-slate-600/50 dark:bg-slate-800/60
-                                      dark:hover:bg-slate-800/80
-                                    "
-                                    value={m.role}
-                                    onChange={(e) =>
-                                      changeRole(selected, m, e.target.value as GroupRole)
-                                    }
-                                    title="Change role"
-                                  >
-                                    <option value="MEMBER">MEMBER</option>
-                                    <option value="MAINTAINER">MAINTAINER</option>
-                                    <option value="OWNER" disabled>
-                                      OWNER
-                                    </option>
-                                  </select>
-                                  {/* caret */}
-                                  <svg
-                                    className="pointer-events-none absolute right-2 top-1/2 h-4 w-4 -translate-y-1/2 opacity-70"
-                                    viewBox="0 0 20 20"
-                                    fill="currentColor"
-                                    aria-hidden="true"
-                                  >
-                                    <path d="M5.5 7.5l4.5 4.5 4.5-4.5" />
-                                  </svg>
-                                </div>
+                                <select
+                                  className="rounded border border-slate-300 bg-white px-2 py-1 text-[11px] font-medium hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-800 dark:hover:bg-slate-700"
+                                  value={m.role}
+                                  onChange={(e) =>
+                                    changeRole(selected, m, e.target.value as GroupRole)
+                                  }
+                                  title="Change role"
+                                >
+                                  <option value="MEMBER">MEMBER</option>
+                                  <option value="ADMIN">ADMIN</option>
+                                  <option value="OWNER" disabled>OWNER</option>
+                                </select>
                               ) : (
                                 <RoleBadge role={m.role as GroupRole} />
                               )}
                             </td>
 
-                            <td className="px-3 py-2">
+                            <td className="px-2 py-1.5">
                               <StatusBadge status={m.status} />
                             </td>
 
-                            <td className="px-3 py-2 text-right">
-                              {canManageMembers(selected) && !isOwnerRow && (
-                                <>
-                                  {isActive && (
-                                    <button
-                                      onClick={() => removeMember(selected, m)}
-                                      className="rounded-md border border-rose-300 bg-rose-50 px-3 py-1.5 text-xs font-medium text-rose-700 transition hover:bg-rose-100 dark:border-rose-800 dark:bg-rose-900/20 dark:text-rose-300 dark:hover:bg-rose-900/40"
-                                    >
-                                      Remove
-                                    </button>
-                                  )}
-                                  {m.status === "PENDING" && (
-                                    <div className="inline-flex gap-2">
+                            {canManageMembers(selected) && (
+                              <td className="px-2 py-1.5 text-right">
+                                {!isOwnerRow && (
+                                  <>
+                                    {isActive && (
                                       <button
-                                        className="rounded-md border border-slate-300 bg-slate-100 px-3 py-1.5 text-xs font-medium text-slate-700 transition hover:bg-slate-200 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200 dark:hover:bg-slate-700"
-                                        onClick={() => resendInvite(selected, m)}
+                                        onClick={() => handleRemoveMember(selected, m)}
+                                        className="rounded-md border border-rose-300 bg-rose-50 px-2 py-1 text-[11px] font-medium text-rose-700 hover:bg-rose-100 dark:border-rose-800 dark:bg-rose-900/20 dark:text-rose-300 dark:hover:bg-rose-900/40"
                                       >
-                                        Resend
+                                        Remove
                                       </button>
+                                    )}
+                                    {m.status === "PENDING" && (
                                       <button
-                                        onClick={() => cancelInvite(selected, m)}
-                                        className="rounded-md border border-rose-300 bg-rose-50 px-3 py-1.5 text-xs font-medium text-rose-700 transition hover:bg-rose-100 dark:border-rose-800 dark:bg-rose-900/20 dark:text-rose-300 dark:hover:bg-rose-900/40"
+                                        onClick={() => handleCancelInvite(selected, m)}
+                                        className="rounded-md border border-rose-300 bg-rose-50 px-2 py-1 text-[11px] font-medium text-rose-700 hover:bg-rose-100 dark:border-rose-800 dark:bg-rose-900/20 dark:text-rose-300 dark:hover:bg-rose-900/40"
                                       >
                                         Cancel
                                       </button>
-                                    </div>
-                                  )}
-                                </>
-                              )}
-                            </td>
+                                    )}
+                                  </>
+                                )}
+                              </td>
+                            )}
                           </tr>
                         );
                       })}
                       {(selected.members ?? []).length === 0 && (
                         <tr>
-                          <td className="px-3 py-2 text-sm text-slate-500" colSpan={4}>
+                          <td className="px-2 py-1.5 text-[13px] text-slate-500" colSpan={canManageMembers(selected) ? 4 : 3}>
                             No members yet.
                           </td>
                         </tr>
@@ -501,22 +596,55 @@ export default function GroupsSection({
                   </table>
                 </div>
 
-                {/* leave */}
-                <div className="mt-3">
-                  {!isOwner(selected) && (
+                {/* leave - only for non-owners */}
+                {!isOwner(selected) && (
+                  <div className="mt-2">
                     <button
-                      onClick={() => leaveGroup(selected!)}
-                      className="rounded-md border border-rose-300 bg-rose-50 px-3 py-1.5 text-xs font-medium text-rose-700 transition hover:bg-rose-100 dark:border-rose-800 dark:bg-rose-900/20 dark:text-rose-300 dark:hover:bg-rose-900/40"
+                      onClick={() => handleLeaveGroup(selected!)}
+                      className="rounded-md border border-rose-300 bg-rose-50 px-2 py-1 text-xs font-medium text-rose-700 hover:bg-rose-100 dark:border-rose-800 dark:bg-rose-900/20 dark:text-rose-300 dark:hover:bg-rose-900/40"
                     >
-                      Leave group
+                      Leave Group
                     </button>
-                  )}
-                </div>
+                  </div>
+                )}
               </div>
             </>
           )}
         </div>
       </div>
+
+      {/* Toast notification */}
+      {toast && (
+        <div
+          className={[
+            "fixed bottom-4 right-4 z-50 rounded-lg px-4 py-3 shadow-lg transition-all",
+            toast.type === "success"
+              ? "border border-emerald-200 bg-emerald-50 text-emerald-800 dark:border-emerald-800 dark:bg-emerald-900/40 dark:text-emerald-200"
+              : "border border-rose-200 bg-rose-50 text-rose-800 dark:border-rose-800 dark:bg-rose-900/40 dark:text-rose-200",
+          ].join(" ")}
+        >
+          <div className="flex items-center gap-2">
+            {toast.type === "success" ? (
+              <svg className="h-5 w-5" fill="currentColor" viewBox="0 0 20 20">
+                <path
+                  fillRule="evenodd"
+                  d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z"
+                  clipRule="evenodd"
+                />
+              </svg>
+            ) : (
+              <svg className="h-5 w-5" fill="currentColor" viewBox="0 0 20 20">
+                <path
+                  fillRule="evenodd"
+                  d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z"
+                  clipRule="evenodd"
+                />
+              </svg>
+            )}
+            <span className="text-sm font-medium">{toast.message}</span>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

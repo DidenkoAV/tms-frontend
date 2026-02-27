@@ -91,12 +91,55 @@ export default function JiraIntegrationForm({
 
   async function onSave(e: React.FormEvent) {
     e.preventDefault();
+
+    // Validate required fields
+    if (!baseUrl.trim()) {
+      setMsg({
+        type: "err",
+        text: "Site URL is required",
+      });
+      clearMsgSoon();
+      return;
+    }
+
+    if (!email.trim()) {
+      setMsg({
+        type: "err",
+        text: "Service email is required",
+      });
+      clearMsgSoon();
+      return;
+    }
+
+    // Validate URL format
+    try {
+      new URL(baseUrl);
+    } catch {
+      setMsg({
+        type: "err",
+        text: "Invalid Site URL format. Please use format: https://your-domain.atlassian.net",
+      });
+      clearMsgSoon();
+      return;
+    }
+
+    // Validate email format
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(email)) {
+      setMsg({
+        type: "err",
+        text: "Invalid email format",
+      });
+      clearMsgSoon();
+      return;
+    }
+
     try {
       await saveJiraConnection(groupId, {
-        baseUrl,
-        email,
+        baseUrl: baseUrl.trim(),
+        email: email.trim(),
         apiToken: token || undefined,
-        defaultProject,
+        defaultProject: defaultProject.trim() || undefined,
       });
 
       if (token) {
@@ -106,15 +149,16 @@ export default function JiraIntegrationForm({
 
       setMsg({
         type: "ok",
-        text: "Jira connection saved.",
+        text: "Jira connection saved successfully!",
       });
 
       setIsEditing(false);
       onStatusChange?.(true);
     } catch (e: any) {
+      const errorMsg = e?.response?.data?.message || "Failed to save Jira connection";
       setMsg({
         type: "err",
-        text: e?.response?.data?.message || "Failed to save Jira connection",
+        text: errorMsg,
       });
       onStatusChange?.(false);
     } finally {
@@ -198,21 +242,23 @@ export default function JiraIntegrationForm({
         <div>Loading Jira settings…</div>
       ) : (
         <>
-          <Field label="Site URL">
+          <Field label="Site URL *">
             <Input
               value={baseUrl}
               onChange={(e) => setBaseUrl(e.target.value)}
               placeholder="https://your-domain.atlassian.net"
               disabled={!isEditing}
+              required
             />
           </Field>
 
-          <Field label="Service email">
+          <Field label="Service email *">
             <Input
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               placeholder="jira-bot@company.com"
               disabled={!isEditing}
+              required
             />
           </Field>
 
@@ -234,6 +280,12 @@ export default function JiraIntegrationForm({
               disabled={!isEditing}
             />
           </Field>
+
+          {isEditing && (
+            <div className="text-xs text-slate-500">
+              * Required fields
+            </div>
+          )}
 
           <div className="flex gap-2">
             {!isEditing ? (

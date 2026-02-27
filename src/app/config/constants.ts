@@ -3,7 +3,7 @@
 /**
  * Routes that don't require authentication
  */
-export const PUBLIC_ROUTES = ["/", "/register", "/verify", "/reset", "/check-email", "/invite/accept"] as const;
+export const PUBLIC_ROUTES = ["/", "/register", "/verify", "/reset", "/check-email", "/invite/accepted"] as const;
 
 /**
  * Check if a given pathname is a public route

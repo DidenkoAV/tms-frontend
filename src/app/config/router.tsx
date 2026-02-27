@@ -24,7 +24,7 @@ import VerifyEmailPage from "@/pages/VerifyEmailPage";
 import ForgotPasswordPage from "@/pages/ForgotPasswordPage";
 import ResetPasswordPage from "@/pages/ResetPasswordPage";
 import ConfirmEmailPage from "@/pages/ConfirmEmailPage";
-import GroupInviteAcceptPage from "@/pages/GroupInviteAcceptPage";
+import InviteAcceptedPage from "@/pages/InviteAcceptedPage";
 import AdminPage from "@/pages/AdminPage";
 import DebugMePage from "@/pages/DebugMePage";
 
@@ -43,7 +43,7 @@ const router = createBrowserRouter([
       { path: "confirm-email", element: <ConfirmEmailPage /> },
 
       // Public group invite acceptance page
-      { path: "invite/accept", element: <GroupInviteAcceptPage /> },
+      { path: "invite/accepted", element: <InviteAcceptedPage /> },
 
       // Private routes (protected by PrivateOutlet)
       {

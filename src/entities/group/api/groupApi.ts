@@ -57,8 +57,17 @@ export async function deleteGroup(groupId: number): Promise<void> {
   await http.delete(`/api/groups/${groupId}`);
 }
 
-export async function addMember(groupId: number, email: string): Promise<void> {
-  await http.post(`/api/groups/${groupId}/members`, { email });
+export async function inviteMember(groupId: number, email: string): Promise<void> {
+  await http.post(`/api/groups/${groupId}/invites`, { email });
+}
+
+export async function getPendingInvites(groupId: number): Promise<GroupMemberSimple[]> {
+  const { data } = await http.get(`/api/groups/${groupId}/invites/pending`);
+  return data;
+}
+
+export async function cancelInvite(groupId: number, membershipId: number): Promise<void> {
+  await http.delete(`/api/groups/${groupId}/invites/${membershipId}`);
 }
 
 export async function changeMemberRole(
@@ -66,7 +75,7 @@ export async function changeMemberRole(
   membershipId: number,
   role: GroupRole
 ): Promise<void> {
-  await http.patch(`/api/groups/${groupId}/members/${membershipId}`, { role });
+  await http.patch(`/api/groups/${groupId}/members/${membershipId}/role`, { role });
 }
 
 export async function removeMember(groupId: number, membershipId: number): Promise<void> {

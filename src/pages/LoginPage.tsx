@@ -1,5 +1,5 @@
 ﻿// src/pages/LoginPage.tsx
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { http, setAuthToken } from "@/lib/http";
 import { useNavigate, Link } from "react-router-dom";
 import { useIsolatedTheme } from "@/shared/utils/useIsolatedTheme";
@@ -46,6 +46,36 @@ export default function LoginPage() {
 
   const params = new URLSearchParams(window.location.search);
   const oauthError = params.get("oauthError") === "1";
+  const verified = params.get("verified") === "1";
+  const passwordSet = params.get("passwordSet") === "true";
+  const emailParam = params.get("email") || "";
+
+  // Pre-fill email if provided
+  useEffect(() => {
+    if (emailParam && !email) {
+      setEmail(emailParam);
+    }
+  }, [emailParam]);
+
+  // Clear any old tokens when landing on login page to prevent "INVALID_CREDENTIALS" flash
+  useEffect(() => {
+    // Only clear if we're not in the middle of a login attempt
+    if (!loading) {
+      setAuthToken(null);
+    }
+  }, []);
+
+  // Map error codes to human-readable messages
+  const getErrorMessage = (errorCode: string): string => {
+    const errorMessages: Record<string, string> = {
+      "INVALID_CREDENTIALS": "Invalid email or password. Please try again.",
+      "USER_NOT_FOUND": "No account found with this email address.",
+      "ACCOUNT_DISABLED": "Your account has been disabled. Please contact support.",
+      "EMAIL_NOT_VERIFIED": "Please verify your email address before signing in.",
+      "TOO_MANY_ATTEMPTS": "Too many login attempts. Please try again later.",
+    };
+    return errorMessages[errorCode] || errorCode;
+  };
 
   async function onSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -57,7 +87,8 @@ export default function LoginPage() {
       // Force full page reload to ensure clean state after login
       window.location.href = "/projects";
     } catch (e: any) {
-      setErr(e?.response?.data?.message || "Login failed");
+      const errorMsg = e?.response?.data?.message || "Login failed";
+      setErr(getErrorMessage(errorMsg));
       setLoading(false);
     }
   }
@@ -107,6 +138,24 @@ function onGoogle() {
             <h1 className="text-xl font-semibold text-slate-900">Sign in to Messagepoint TMS</h1>
             <p className="text-sm text-slate-600">Your smart test workspace</p>
           </div>
+
+          {verified && (
+            <div
+              role="alert"
+              className="px-3 py-2 mb-4 text-sm border rounded-lg border-emerald-200 bg-emerald-50 text-emerald-700"
+            >
+              ✓ Email verified successfully! You can now sign in.
+            </div>
+          )}
+
+          {passwordSet && (
+            <div
+              role="alert"
+              className="px-3 py-2 mb-4 text-sm border rounded-lg border-emerald-200 bg-emerald-50 text-emerald-700"
+            >
+              ✓ Password set successfully! You can now sign in.
+            </div>
+          )}
 
           {oauthError && (
             <div
