@@ -73,7 +73,6 @@ function TestCasesPageContent() {
   }
 
   const { me } = useMe();
-  const groupId = me?.currentGroupId ?? me?.groups?.[0]?.id ?? null;
 
   const [project, setProject] = useState<Project | null>(null);
   const [suites, setSuites] = useState<Suite[]>([]);
@@ -184,26 +183,18 @@ function TestCasesPageContent() {
       setCases(casesRes.data);
 
       // Load group members for assignee dropdown
-      if (groupId) {
+      // For both PERSONAL and SHARED groups, show all ACTIVE members
+      // This allows assigning test cases to any team member
+      // Use project's groupId, not the one from me
+      const projectGroupId = p.groupId;
+
+      if (projectGroupId) {
         try {
-          const members = await getGroupMembers(groupId);
-          console.log("=== ASSIGNEE FILTERING DEBUG ===");
-          console.log("Project:", p.name);
-          console.log("Project groupPersonal:", p.groupPersonal);
-          console.log("Current user ID:", me?.id);
-          console.log("All members:", members);
+          const members = await getGroupMembers(projectGroupId);
 
-          // Filter only ACTIVE members
-          let activeMembers = members.filter(m => m.status === "ACTIVE");
-          console.log("Active members:", activeMembers);
+          // Filter only ACTIVE members (exclude PENDING and REMOVED)
+          const activeMembers = members.filter(m => m.status === "ACTIVE");
 
-          // If project belongs to a personal group, only show current user
-          if (p.groupPersonal && me?.id) {
-            console.log("Filtering for personal group - keeping only user", me.id);
-            activeMembers = activeMembers.filter(m => m.userId === me.id);
-          }
-
-          console.log("Final members for assignee:", activeMembers);
           setGroupMembers(activeMembers);
         } catch (e) {
           console.warn("Failed to load group members:", e);
@@ -574,8 +565,8 @@ function TestCasesPageContent() {
     dataVersion,
     groupMembers: groupMembers.map(m => ({
       userId: m.userId,
-      name: m.userName,
-      email: m.userEmail,
+      name: m.fullName,
+      email: m.email,
     })),
   };
 

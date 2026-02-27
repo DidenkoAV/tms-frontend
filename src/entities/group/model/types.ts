@@ -52,12 +52,12 @@ export interface GroupMember {
 export interface GroupMemberSimple {
   id: number; // membership id
   userId: number;
-  userName: string;
-  userEmail: string;
+  email: string;
+  fullName: string;
   role: GroupRole;
   status: MembershipStatus;
-  joinedAt: string | null;
-  invitedBy: string | null;
+  invitedByEmail?: string | null;
+  createdAt?: string; // ISO
 }
 
 export interface GroupDetails extends GroupSummary {

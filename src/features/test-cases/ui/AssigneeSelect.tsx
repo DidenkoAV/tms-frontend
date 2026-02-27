@@ -23,9 +23,10 @@ export default function AssigneeSelect({ value, options, onChange, disabled }: P
   const displayName = selected?.name || selected?.email?.split('@')[0] || "Unassigned";
 
   // Use teal color for assigned users, slate for unassigned
+  // In dark mode, use white/transparent like other dropdowns
   const isAssigned = value !== null;
   const colorClasses = isAssigned
-    ? "border-teal-200 bg-teal-50 text-teal-700 hover:shadow-sm dark:border-teal-500/30 dark:bg-teal-500/10 dark:text-teal-300"
+    ? "border-teal-200 bg-teal-50 text-teal-700 hover:shadow-sm dark:border-slate-700 dark:bg-transparent dark:text-white"
     : "border-slate-300 bg-white/70 text-slate-700 hover:shadow-sm dark:border-slate-700 dark:bg-transparent dark:text-white";
 
   return (
