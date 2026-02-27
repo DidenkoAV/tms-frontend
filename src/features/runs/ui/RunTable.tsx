@@ -204,6 +204,7 @@ function AutomationControl({
 interface Props {
   projectId: number;
   runId: number;
+  groupId?: number;
   groups: SuiteGroup[];
   casesMap: Record<number, TestCase>;
   cols: VisibleCols;
@@ -236,6 +237,7 @@ interface Props {
 export default function RunTable({
   projectId,
   runId,
+  groupId,
   groups,
   casesMap,
   cols,
@@ -397,7 +399,7 @@ export default function RunTable({
                   <span className={headLabel}>Status</span>
                 </th>
               )}
-              <th className="w-[80px] px-3 py-3 text-center">
+              <th className="w-[100px] px-3 py-3 text-center">
                 <span className={`${headLabel} inline-block`}>Actions</span>
               </th>
             </tr>
@@ -578,7 +580,7 @@ export default function RunTable({
                               {cols.jira && (
                                 <td className="px-3 py-2">
                                   <JiraIssuesInline
-                                    groupId={0}
+                                    groupId={groupId ?? 0}
                                     testCaseId={rc.caseId}
                                   />
                                 </td>

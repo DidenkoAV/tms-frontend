@@ -72,50 +72,55 @@ export default function RunsHeader({
         />
       </div>
 
-      {/* --- Legend --- */}
-      <section className="mt-3 rounded-2xl border border-slate-200 bg-white p-3 dark:border-slate-800 dark:bg-[#0f1524]">
-        <div className="flex flex-wrap items-center gap-2 text-sm">
-          <span className="inline-flex items-center gap-1 text-slate-600 dark:text-slate-300">
-            <svg
-              width="14"
-              height="14"
-              viewBox="0 0 24 24"
-              fill="none"
-              aria-hidden
-            >
-              <circle
-                cx="12"
-                cy="12"
-                r="9"
-                stroke="currentColor"
-                strokeWidth="1.6"
-              />
-              <path
-                d="M12 10v7M12 7h.01"
-                stroke="currentColor"
-                strokeWidth="1.6"
-                strokeLinecap="round"
-              />
-            </svg>
-            Legend:
-          </span>
-          {[
-            { label: "Passed", color: "bg-emerald-500" },
-            { label: "Failed", color: "bg-rose-500" },
-            { label: "Retest", color: "bg-amber-400" },
-            { label: "Skipped", color: "bg-sky-500" },
-            { label: "Broken", color: "bg-slate-500" },
-          ].map((s) => (
-            <span
-              key={s.label}
-              className="inline-flex items-center gap-2 px-2 py-1 text-xs border rounded-md border-slate-300 bg-white/70 text-slate-700 dark:border-slate-700 dark:bg-slate-900/40 dark:text-slate-200"
-            >
-              <span className={`h-2.5 w-4 rounded ${s.color}`} />
-              {s.label}
-            </span>
-          ))}
-        </div>
-      </section>
     </header>
+  );
+}
+
+/* --- Legend Component (exported separately) --- */
+export function RunsLegend() {
+  return (
+    <section className="rounded-2xl border border-slate-200 bg-white p-3 shadow-sm dark:border-slate-800 dark:bg-[#0f1524]">
+      <div className="flex flex-wrap items-center gap-2 text-sm">
+        <span className="inline-flex items-center gap-1 text-slate-600 dark:text-slate-300">
+          <svg
+            width="14"
+            height="14"
+            viewBox="0 0 24 24"
+            fill="none"
+            aria-hidden
+          >
+            <circle
+              cx="12"
+              cy="12"
+              r="9"
+              stroke="currentColor"
+              strokeWidth="1.6"
+            />
+            <path
+              d="M12 10v7M12 7h.01"
+              stroke="currentColor"
+              strokeWidth="1.6"
+              strokeLinecap="round"
+            />
+          </svg>
+          Legend:
+        </span>
+        {[
+          { label: "Passed", color: "bg-emerald-500" },
+          { label: "Failed", color: "bg-rose-500" },
+          { label: "Retest", color: "bg-amber-400" },
+          { label: "Skipped", color: "bg-sky-500" },
+          { label: "Broken", color: "bg-slate-500" },
+        ].map((s) => (
+          <span
+            key={s.label}
+            className="inline-flex items-center gap-2 px-2 py-1 text-xs border rounded-md border-slate-300 bg-white/70 text-slate-700 dark:border-slate-700 dark:bg-slate-900/40 dark:text-slate-200"
+          >
+            <span className={`h-2.5 w-4 rounded ${s.color}`} />
+            {s.label}
+          </span>
+        ))}
+      </div>
+    </section>
   );
 }

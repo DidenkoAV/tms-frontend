@@ -20,12 +20,12 @@ function MiniSwitch({
         ${
           checked
             ? "border-slate-900 bg-slate-900 dark:border-emerald-400 dark:bg-emerald-400"
-            : "border-slate-300 bg-white dark:border-slate-600 dark:bg-slate-800"
+            : "border-slate-400 bg-slate-200 dark:border-slate-600 dark:bg-slate-800"
         }`}
     >
       <span
-        className={`ml-[2px] h-[12px] w-[12px] rounded-full bg-white transition-transform duration-200 dark:bg-slate-100
-          ${checked ? "translate-x-[12px]" : "translate-x-0"}`}
+        className={`ml-[2px] h-[12px] w-[12px] rounded-full transition-transform duration-200
+          ${checked ? "translate-x-[12px] bg-white dark:bg-slate-100" : "translate-x-0 bg-slate-500 dark:bg-slate-400"}`}
       />
     </button>
   );

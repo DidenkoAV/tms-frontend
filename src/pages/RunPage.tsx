@@ -4,6 +4,7 @@ import { useLocation, useNavigate, useParams } from "react-router-dom";
 import { http } from "@/lib/http";
 
 // Entities (new structure)
+import { listAllProjects } from "@/entities/project";
 import type { Run, RunCase } from "@/entities/test-run";
 import {
   addCasesToRun as addCasesToRunApi,
@@ -25,6 +26,7 @@ import {
   AddToRunModal,
   RunToolbar,
 } from "@/features/runs";
+import { JiraBatchProvider, useJiraBatch } from "@/features/integrations/jira/ui/JiraBatchContext";
 
 /* ---------- icons ---------- */
 function IconBack() {
@@ -69,12 +71,13 @@ const HIDE_SUITES_KEY = "run.hideSuites";
 /* ---------- alerts & confirm ---------- */
 type BannerKind = "info" | "error" | "success" | "warning";
 
-export default function RunPage() {
+function RunPageContent() {
   const { id, runId } = useParams();
   const projectId = Number(id ?? NaN);
   const rid = Number(runId ?? NaN);
   const nav = useNavigate();
   const location = useLocation();
+  const jiraBatch = useJiraBatch();
 
   const state = (location.state || {}) as any;
   const milestoneIdFromState = state?.milestoneId;
@@ -99,6 +102,7 @@ export default function RunPage() {
     if (ms) setTimeout(() => setBanner(null), ms);
   };
 
+  const [project, setProject] = useState<{ id: number; groupId: number } | null>(null);
   const [run, setRun] = useState<Run | null>(null);
   const [runCases, setRunCases] = useState<RunCase[]>([]);
   const [casesMap, setCasesMap] = useState<Record<number, TestCase>>({});
@@ -113,7 +117,7 @@ export default function RunPage() {
     priority: true,
     automation: true,
     author: true,
-    jira: true,
+    jira: true, // Now enabled with JiraBatchProvider
   };
 
   const [cols, setCols] = useState<VisibleCols>(() => {
@@ -173,7 +177,8 @@ export default function RunPage() {
       setLoading(true);
       setErr(null);
       try {
-        const [runRes, rc, allCasesRes, suitesRes, groupsRes] = await Promise.all([
+        const [allProjects, runRes, rc, allCasesRes, suitesRes, groupsRes] = await Promise.all([
+          listAllProjects(),
           getRun(rid),
           listRunCases(rid),
           listCases(projectId, { size: 0 }),
@@ -188,6 +193,13 @@ export default function RunPage() {
         ]);
         if (!alive) return;
 
+        const p = allProjects.find((x) => x.id === projectId);
+        if (!p) {
+          nav("/projects", { replace: true });
+          return;
+        }
+
+        setProject({ id: p.id, groupId: p.groupId });
         setRun(runRes);
         setRunCases(rc);
 
@@ -195,6 +207,12 @@ export default function RunPage() {
         setAllCases(arr);
         setCasesMap(Object.fromEntries(arr.map((c) => [c.id, c])));
         setSuites(suitesRes);
+
+        // Load Jira issues for all cases in the run
+        if (p.groupId && rc.length > 0) {
+          const caseIds = rc.map((r) => r.caseId);
+          jiraBatch.loadBatch(p.groupId, caseIds);
+        }
       } catch (e: any) {
         if (!alive) return;
         setErr(e?.response?.data?.message || "Failed to load run");
@@ -205,6 +223,7 @@ export default function RunPage() {
     return () => {
       alive = false;
     };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [projectId, rid, nav]);
 
   /* ---------- Aggregations ---------- */
@@ -390,6 +409,7 @@ export default function RunPage() {
       <RunTable
         projectId={projectId}
         runId={rid}
+        groupId={project?.groupId}
         groups={groups}
         casesMap={casesMap}
         cols={cols}
@@ -441,5 +461,14 @@ export default function RunPage() {
 
       {confirm.ui}
     </div>
+  );
+}
+
+// Wrapper component with JiraBatchProvider
+export default function RunPage() {
+  return (
+    <JiraBatchProvider>
+      <RunPageContent />
+    </JiraBatchProvider>
   );
 }

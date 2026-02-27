@@ -13,7 +13,7 @@ import {
 } from "@/entities/test-run";
 import type { Run } from "@/entities/test-run";
 import { useConfirm, AlertBanner } from "@/shared/ui/alert";
-import { RunsHeader, RunsTable as RunTable, RunCreateForm } from "@/features/runs";
+import { RunsHeader, RunsLegend, RunsTable as RunTable, RunCreateForm } from "@/features/runs";
 
 type StatusKey = "PASSED" | "RETEST" | "FAILED" | "SKIPPED" | "BROKEN";
 type RunStats = {
@@ -337,6 +337,8 @@ export default function RunsPage() {
         q={q}
         onSearch={setQ}
       />
+
+      <RunsLegend />
 
       <RunTable
         projectId={projectId}

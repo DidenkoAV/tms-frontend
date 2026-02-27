@@ -73,13 +73,33 @@ export function RunBreakdown({
 
   if (loading && !ready) {
     return (
-      <div className="flex items-center w-full gap-3">
-        <div className="relative flex-1 h-6 overflow-hidden rounded-lg bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700">
-          <div className="absolute inset-0 animate-pulse bg-slate-200/80 dark:bg-slate-700/60" />
+      <div className="flex w-full flex-col gap-2">
+        {/* Loading progress bar with shimmer effect */}
+        <div className="relative flex-1 h-6 overflow-hidden rounded-lg bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 shadow-sm">
+          {/* Shimmer animation */}
+          <div className="absolute inset-0 bg-gradient-to-r from-transparent via-slate-200/60 dark:via-slate-700/40 to-transparent animate-[shimmer_1.5s_ease-in-out_infinite]"
+               style={{
+                 backgroundSize: '200% 100%',
+                 animation: 'shimmer 1.5s ease-in-out infinite',
+               }}
+          />
+          {/* Loading text overlay */}
+          <div className="absolute inset-0 flex items-center justify-center">
+            <span className="text-xs font-semibold text-slate-500 dark:text-slate-400 tracking-wide">
+              Loading test results...
+            </span>
+          </div>
         </div>
-        <span className="text-sm font-medium tracking-tight text-slate-400 dark:text-slate-500 min-w-[60px] text-right">
-          Loading…
-        </span>
+
+        {/* Loading legend placeholder */}
+        <div className="flex items-center gap-3 text-[11px] font-medium">
+          {[1, 2, 3].map((i) => (
+            <div key={i} className="flex items-center gap-1.5 animate-pulse">
+              <span className="h-2 w-2 rounded-sm bg-slate-300 dark:bg-slate-600" />
+              <span className="h-3 w-16 rounded bg-slate-200 dark:bg-slate-700" />
+            </div>
+          ))}
+        </div>
       </div>
     );
   }

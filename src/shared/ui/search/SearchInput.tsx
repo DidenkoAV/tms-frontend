@@ -53,7 +53,7 @@ export default function SearchInput({
 
   return (
     <div
-      className={`relative flex items-center w-[220px] sm:w-[260px] overflow-hidden rounded-2xl border border-slate-200/80 bg-white/80 backdrop-blur shadow-[0_8px_30px_rgba(15,23,42,0.08)] transition-all duration-300 focus-within:border-emerald-300/70 focus-within:shadow-[0_12px_38px_rgba(6,182,212,0.25)] dark:border-slate-700/70 dark:bg-slate-900/60 dark:shadow-[0_12px_34px_rgba(1,4,20,0.7)] dark:focus-within:border-emerald-400/60 dark:focus-within:shadow-[0_16px_38px_rgba(16,185,129,0.35)] ${className}`}
+      className={`relative flex items-center w-[220px] sm:w-[260px] overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm transition-all duration-300 focus-within:border-slate-300 focus-within:shadow-md dark:border-slate-700 dark:bg-slate-900/60 dark:shadow-[0_12px_34px_rgba(1,4,20,0.7)] dark:focus-within:border-slate-100 dark:focus-within:shadow-[0_8px_24px_rgba(255,255,255,0.15)] ${className}`}
     >
       {/* Search icon */}
       <div className="absolute inset-y-0 flex items-center pointer-events-none left-3 text-slate-400 dark:text-slate-500">

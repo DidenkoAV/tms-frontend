@@ -7,5 +7,5 @@ export { default as RunTable, type VisibleCols as RunTableVisibleCols } from "./
 export { default as RunComments } from "./ui/RunComments";
 export { default as RunStatusField } from "./ui/RunStatusField";
 export { default as RunsTable } from "./ui/RunsTable";
-export { default as RunsHeader } from "./ui/RunsHeader";
+export { default as RunsHeader, RunsLegend } from "./ui/RunsHeader";
 

@@ -200,11 +200,11 @@ export default function RunTable(props: Props) {
                 />
               </th>
 
-              <th className={`${padX} ${padY} w-[420px]`}>
+              <th className={`${padX} ${padY} w-[680px]`}>
                 {cols.status && <span className={headLabel}>Status</span>}
               </th>
 
-              <th className={`${padX} ${padY} w-[240px]`}>
+              <th className={`${padX} ${padY} w-[140px]`}>
                 {cols.author && (
                   <SortHeader
                     label="Author"
@@ -219,7 +219,7 @@ export default function RunTable(props: Props) {
                 )}
               </th>
 
-              <th className={`${padX} ${padY} text-right w-[160px]`}>
+              <th className={`${padX} ${padY} text-right w-[100px]`}>
                 <span className={`${headLabel} inline-block text-right`}>
                   Actions
                 </span>
@@ -325,10 +325,10 @@ export default function RunTable(props: Props) {
                   </td>
 
                   {/* Status (dropdown + breakdown bar) */}
-                  <td className={`${padX} ${padY} w-[420px]`}>
+                  <td className={`${padX} ${padY} w-[420px] align-middle`}>
                     {cols.status && (
-                      <div className="flex w-full items-start gap-5">
-                        <div className="shrink-0 pt-0.5">
+                      <div className="flex w-full items-center gap-5">
+                        <div className="shrink-0">
                           <RunStatusPicker
                             valueId={
                               isClosed ? RUN_STATE_ID.CLOSED : RUN_STATE_ID.OPEN
@@ -352,7 +352,7 @@ export default function RunTable(props: Props) {
                   </td>
 
                   {/* Author */}
-                  <td className={`${padX} ${padY} w-[120px]`}>
+                  <td className={`${padX} ${padY} w-[120px] align-middle`}>
                     {cols.author && (
                       <AuthorCell
                         name={r.createdByName}
