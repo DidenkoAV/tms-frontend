@@ -29,9 +29,9 @@ function buildGridTemplate(cols: Record<ColKey, boolean>): string {
   if (cols.automation) parts.push("90px"); // Compact: 110 → 90
   if (cols.author) parts.push("110px");    // Compact: 120 → 110
   if (cols.assigned) parts.push("140px");  // Wider for dropdown: 120 → 140
-  if (cols.jira) parts.push("160px");      // Wider for multiple tickets + actions: 140 → 160
+  if (cols.jira) parts.push("120px");      // Optimized: 160 → 120
 
-  parts.push("80px"); // Actions column - more compact: 96 → 80
+  parts.push("82px"); // Actions column - balanced: 80 → 82
 
   // Return CSS value for gridTemplateColumns, not className
   return parts.join(" ");

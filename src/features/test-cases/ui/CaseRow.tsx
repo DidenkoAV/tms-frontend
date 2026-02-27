@@ -99,7 +99,7 @@ export default function CaseRow({
       onClick={() => onOpen()}
       title="Click to open case"
     >
-      <div className="grid gap-2" style={{ gridTemplateColumns: gridCols }}>
+      <div className="grid gap-1.5" style={{ gridTemplateColumns: gridCols }}>
         {/* TITLE */}
         <div className="flex items-center min-w-0 gap-2">
           <TFCheckbox
