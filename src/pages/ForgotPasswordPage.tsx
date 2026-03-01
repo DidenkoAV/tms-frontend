@@ -4,6 +4,8 @@ import { http } from "@/lib/http";
 import { useIsolatedTheme } from "@/shared/utils/useIsolatedTheme";
 import messagepointLogo from "@/public/logos/logo.svg";
 
+const BRAND_COLOR = "#7c1a87";
+
 /* --- Messagepoint logo --- */
 function MPLogo({ size = 64 }: { size?: number }) {
   return (
@@ -30,57 +32,26 @@ export default function ForgotPasswordPage() {
 
   async function onSubmit(e: FormEvent) {
     e.preventDefault();
+    if (loading) return;
     setErr(null);
 
-    if (!email) {
+    const normalizedEmail = email.trim();
+    if (!normalizedEmail) {
       setErr("Email is required");
       return;
     }
 
     setLoading(true);
     try {
-      await http.post(`/api/auth/password/request-reset?email=${encodeURIComponent(email)}`);
+      await http.post(
+        `/api/auth/password/request-reset?email=${encodeURIComponent(normalizedEmail)}`
+      );
       setSuccess(true);
     } catch (e: any) {
       setErr(e?.response?.data?.message || "Failed to send reset email");
+    } finally {
       setLoading(false);
     }
-  }
-
-  if (success) {
-    return (
-      <div className="min-h-screen bg-slate-50">
-        <style>{`
-          body { background: #f8fafc !important; }
-        `}</style>
-
-        <div className="grid px-4 py-10 place-items-center">
-          <div className="w-full max-w-md p-8 bg-white border shadow-lg rounded-2xl border-slate-200 text-center">
-            <div className="mx-auto mb-4 h-16 w-16 rounded-full bg-green-100 grid place-items-center">
-              <span className="text-3xl">📧</span>
-            </div>
-            <h1 className="mb-2 text-2xl font-semibold text-slate-900">Check Your Email</h1>
-            <p className="text-slate-600">
-              If an account exists for <strong className="text-slate-900">{email}</strong>, we've sent a password reset link.
-            </p>
-            <p className="mt-3 text-sm text-slate-500">
-              Please check your inbox and follow the instructions to reset your password.
-            </p>
-            <div className="mt-6">
-              <Link
-                to="/"
-                className="inline-block px-6 py-3 font-semibold text-white rounded-lg"
-                style={{ backgroundColor: "#7c1a87" }}
-                onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = "#6a1675")}
-                onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = "#7c1a87")}
-              >
-                Back to Login
-              </Link>
-            </div>
-          </div>
-        </div>
-      </div>
-    );
   }
 
   return (
@@ -100,68 +71,89 @@ export default function ForgotPasswordPage() {
       `}</style>
 
       <div className="grid px-4 py-10 place-items-center">
-        <div className="w-full max-w-md p-8 bg-white border shadow-lg rounded-2xl border-slate-200">
-          <div className="grid gap-3 mb-6 place-items-center">
-            <MPLogo size={72} />
-            <h1 className="text-xl font-semibold text-slate-900">Forgot Password?</h1>
-            <p className="text-sm text-slate-600">
-              Enter your email address and we'll send you a link to reset your password.
+        {success ? (
+          <div className="w-full max-w-md p-8 bg-white border shadow-lg rounded-2xl border-slate-200 text-center">
+            <div className="mx-auto mb-4 h-16 w-16 rounded-full bg-green-100 grid place-items-center">
+              <span className="text-3xl">📧</span>
+            </div>
+            <h1 className="mb-2 text-2xl font-semibold text-slate-900">Check Your Email</h1>
+            <p className="text-slate-600">
+              If an account exists for <strong className="text-slate-900">{email}</strong>, we've sent a password reset link.
             </p>
+            <p className="mt-3 text-sm text-slate-500">
+              Please check your inbox and follow the instructions to reset your password.
+            </p>
+            <div className="mt-6">
+              <Link
+                to="/"
+                className="inline-block px-6 py-3 font-semibold text-white rounded-lg transition-colors"
+                style={{ backgroundColor: BRAND_COLOR }}
+              >
+                Back to Login
+              </Link>
+            </div>
           </div>
-
-          <form onSubmit={onSubmit} className="space-y-5">
-            <div>
-              <label htmlFor="email" className="mb-1.5 block text-sm font-medium text-slate-700">
-                Email Address
-              </label>
-              <input
-                id="email"
-                type="email"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                className="w-full px-4 py-3 bg-white border rounded-lg outline-none border-slate-300 text-slate-900 placeholder-slate-400 focus:border-[#7c1a87] focus:ring-2 focus:ring-[#7c1a87]/20 disabled:bg-slate-50 disabled:text-slate-500"
-                placeholder="you@example.com"
-                disabled={loading}
-                autoFocus
-                required
-                autoComplete="email"
-              />
+        ) : (
+          <div className="w-full max-w-md p-8 bg-white border shadow-lg rounded-2xl border-slate-200">
+            <div className="grid gap-3 mb-6 place-items-center">
+              <MPLogo size={72} />
+              <h1 className="text-xl font-semibold text-slate-900">Forgot Password?</h1>
+              <p className="text-sm text-slate-600">
+                Enter your email address and we'll send you a link to reset your password.
+              </p>
             </div>
 
-            {err && (
-              <div
-                role="alert"
-                className="px-3 py-2 text-sm border rounded-lg border-rose-200 bg-rose-50 text-rose-700"
-              >
-                {err}
+            <form onSubmit={onSubmit} className="space-y-5">
+              <div>
+                <label htmlFor="email" className="mb-1.5 block text-sm font-medium text-slate-700">
+                  Email Address
+                </label>
+                <input
+                  id="email"
+                  type="email"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  className="w-full px-4 py-3 bg-white border rounded-lg outline-none border-slate-300 text-slate-900 placeholder-slate-400 focus:border-[#7c1a87] focus:ring-2 focus:ring-[#7c1a87]/20 disabled:bg-slate-50 disabled:text-slate-500"
+                  placeholder="you@example.com"
+                  disabled={loading}
+                  autoFocus
+                  required
+                  autoComplete="email"
+                />
               </div>
-            )}
 
-            <button
-              type="submit"
-              disabled={loading}
-              className="w-full px-6 py-3 font-semibold text-white rounded-lg disabled:cursor-not-allowed disabled:opacity-60"
-              style={{ backgroundColor: "#7c1a87" }}
-              onMouseEnter={(e) => !loading && (e.currentTarget.style.backgroundColor = "#6a1675")}
-              onMouseLeave={(e) => !loading && (e.currentTarget.style.backgroundColor = "#7c1a87")}
-            >
-              {loading ? "Sending..." : "Send Reset Link"}
-            </button>
-          </form>
+              {err && (
+                <div
+                  role="alert"
+                  className="px-3 py-2 text-sm border rounded-lg border-rose-200 bg-rose-50 text-rose-700"
+                >
+                  {err}
+                </div>
+              )}
 
-          <div className="mt-6 text-sm text-center text-slate-600">
-            Remember your password?{" "}
-            <Link
-              to="/"
-              className="font-medium underline-offset-2 hover:underline"
-              style={{ color: "#7c1a87" }}
-            >
-              Sign in
-            </Link>
+              <button
+                type="submit"
+                disabled={loading}
+                className="w-full px-6 py-3 font-semibold text-white rounded-lg disabled:cursor-not-allowed disabled:opacity-60 transition-colors"
+                style={{ backgroundColor: BRAND_COLOR }}
+              >
+                {loading ? "Sending..." : "Send Reset Link"}
+              </button>
+            </form>
+
+            <div className="mt-6 text-sm text-center text-slate-600">
+              Remember your password?{" "}
+              <Link
+                to="/"
+                className="font-medium underline-offset-2 hover:underline"
+                style={{ color: BRAND_COLOR }}
+              >
+                Sign in
+              </Link>
+            </div>
           </div>
-        </div>
+        )}
       </div>
     </div>
   );
 }
-

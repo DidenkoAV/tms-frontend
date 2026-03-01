@@ -1,16 +1,17 @@
 // src/pages/CaseEditorPage.tsx
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   useLocation,
   useNavigate,
   useParams,
   useSearchParams,
 } from "react-router-dom";
-import { http } from "@/lib/http";
 
 // Entities (new structure)
 import {
   createCase as apiCreateCase,
+  getCase as apiGetCase,
+  listSuites as apiListSuites,
   updateCase as apiUpdateCase,
 } from "@/entities/test-case";
 import { parseDuration, formatDuration } from "@/shared/utils/duration";
@@ -128,6 +129,68 @@ export default function CaseEditorPage() {
   const [showPreconditionsPreview, setShowPreconditionsPreview] =
     useState(false);
 
+  const updateFormField = useCallback(
+    (key: keyof FormState, value: FormState[keyof FormState]) => {
+      setForm((prev) => ({ ...prev, [key]: value }));
+    },
+    []
+  );
+  const onChangeTitle = useCallback(
+    (next: string) => updateFormField("title", next),
+    [updateFormField]
+  );
+  const onChangePreconditions = useCallback(
+    (next: string) => updateFormField("preconditions", next),
+    [updateFormField]
+  );
+  const onChangeSteps = useCallback(
+    (next: StepFormLocal[]) => updateFormField("steps", next),
+    [updateFormField]
+  );
+  const onChangeExpectedResult = useCallback(
+    (next: string) => updateFormField("expectedResult", next),
+    [updateFormField]
+  );
+  const onChangeActualResult = useCallback(
+    (next: string) => updateFormField("actualResult", next),
+    [updateFormField]
+  );
+  const onChangePriority = useCallback(
+    (next: PriorityLabel) => updateFormField("priority", next),
+    [updateFormField]
+  );
+  const onChangeType = useCallback(
+    (next: CaseTypeLabel) => updateFormField("type", next),
+    [updateFormField]
+  );
+  const onChangeAutomation = useCallback(
+    (next: AutomationLabel) => updateFormField("automationStatus", next),
+    [updateFormField]
+  );
+  const onChangeEstimate = useCallback(
+    (next: string) => updateFormField("estimate", next),
+    [updateFormField]
+  );
+  const onChangeTags = useCallback(
+    (next: string[]) => updateFormField("tags", next),
+    [updateFormField]
+  );
+  const onChangeStatus = useCallback(
+    (next: string) => updateFormField("status", next),
+    [updateFormField]
+  );
+  const onChangeTestData = useCallback(
+    (next: string) => updateFormField("testData", next),
+    [updateFormField]
+  );
+  const onChangeAttachments = useCallback(
+    (next: File[]) => updateFormField("attachments", next),
+    [updateFormField]
+  );
+  const onChangeAutotestMapping = useCallback((next: FormState["autotestMapping"]) => {
+    setForm((prev) => ({ ...prev, autotestMapping: next }));
+  }, []);
+
   /* ------------ load ------------ */
   useEffect(() => {
     if (!Number.isFinite(projectId) || projectId <= 0) {
@@ -139,16 +202,13 @@ export default function CaseEditorPage() {
       setLoading(true);
       setErr(null);
       try {
-        const suitesRes = await http.get<Suite[]>(
-          `/api/projects/${projectId}/suites`
-        );
-        if (!alive) return;
-        setSuites(suitesRes.data);
-
         if (isEdit) {
-          const caseRes = await http.get<TestCase>(`/api/cases/${editingId}`);
+          const [suitesData, bk] = await Promise.all([
+            apiListSuites(projectId),
+            apiGetCase(editingId as number),
+          ]);
           if (!alive) return;
-          const bk = caseRes.data;
+          setSuites(suitesData as Suite[]);
 
           const steps: StepFormLocal[] = (bk.steps ?? []).map((st) => ({
             action: (st.action ?? "").trim(),
@@ -185,6 +245,9 @@ export default function CaseEditorPage() {
             autotestMapping: mapping,
           });
         } else {
+          const suitesData = await apiListSuites(projectId);
+          if (!alive) return;
+          setSuites(suitesData as Suite[]);
           setForm((prev) => ({
             ...prev,
             suiteId: suiteFromQuery ? Number(suiteFromQuery) : "",
@@ -305,7 +368,7 @@ export default function CaseEditorPage() {
         badge={isEdit && editingId ? `Case ID ${editingId}` : undefined}
         title={form.title}
         error={errors.title}
-        onChangeTitle={(next) => setForm((prev) => ({ ...prev, title: next }))}
+        onChangeTitle={onChangeTitle}
         onSave={save}
         saving={saving}
         isValid={isValid}
@@ -331,27 +394,20 @@ export default function CaseEditorPage() {
             <CasePreconditionsBlock
               value={form.preconditions}
               preview={showPreconditionsPreview}
-              onChange={(v) => setForm((f) => ({ ...f, preconditions: v }))}
+              onChange={onChangePreconditions}
               onTogglePreview={setShowPreconditionsPreview}
             />
-            <CaseStepsBlock
-              steps={form.steps}
-              onChange={(steps) => setForm((f) => ({ ...f, steps }))}
-            />
+            <CaseStepsBlock steps={form.steps} onChange={onChangeSteps} />
             <div className="grid gap-4">
               <CaseExpectedResult
                 mode="form"
                 value={form.expectedResult}
-                onChange={(v) =>
-                  setForm((prev) => ({ ...prev, expectedResult: v }))
-                }
+                onChange={onChangeExpectedResult}
               />
               <CaseActualResult
                 mode="form"
                 value={form.actualResult}
-                onChange={(v) =>
-                  setForm((prev) => ({ ...prev, actualResult: v }))
-                }
+                onChange={onChangeActualResult}
               />
             </div>
           </div>
@@ -365,32 +421,22 @@ export default function CaseEditorPage() {
               automation={form.automationStatus}
               estimate={form.estimate}
               tags={form.tags}
-              onChangePriority={(v) => setForm((p) => ({ ...p, priority: v }))}
-              onChangeType={(v) => setForm((p) => ({ ...p, type: v }))}
-              onChangeAutomation={(v) =>
-                setForm((p) => ({ ...p, automationStatus: v }))
-              }
-              onChangeEstimate={(v) => setForm((p) => ({ ...p, estimate: v }))}
-              onChangeTags={(v) => setForm((p) => ({ ...p, tags: v }))}
+              onChangePriority={onChangePriority}
+              onChangeType={onChangeType}
+              onChangeAutomation={onChangeAutomation}
+              onChangeEstimate={onChangeEstimate}
+              onChangeTags={onChangeTags}
               status={inRunContext ? form.status : undefined}
-              onChangeStatus={
-                inRunContext
-                  ? (v) => setForm((p) => ({ ...p, status: v }))
-                  : undefined
-              }
+              onChangeStatus={inRunContext ? onChangeStatus : undefined}
               testData={form.testData}
-              onChangeTestData={(v) => setForm((p) => ({ ...p, testData: v }))}
+              onChangeTestData={onChangeTestData}
               attachments={form.attachments}
-              onChangeAttachments={(f) =>
-                setForm((p) => ({ ...p, attachments: f }))
-              }
+              onChangeAttachments={onChangeAttachments}
             />
 
             <AutotestMappingBlock
               fields={form.autotestMapping}
-              onChange={(next) =>
-                setForm((p) => ({ ...p, autotestMapping: next }))
-              }
+              onChange={onChangeAutotestMapping}
               onSave={() => save(false)}
               saving={saving}
               defaultEditing

@@ -8,6 +8,7 @@ export default function InviteAcceptedPage() {
   const navigate = useNavigate();
   const needsPassword = search.get("needsPassword") === "true";
   const email = search.get("email") || "";
+  const setToken = search.get("setToken") || "";
 
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
@@ -58,9 +59,15 @@ export default function InviteAcceptedPage() {
         setLoading(false);
         return;
       }
+      if (!setToken) {
+        setError("Password setup token is missing or expired. Please request a new invitation link.");
+        setLoading(false);
+        return;
+      }
 
       const { data } = await http.post("/api/auth/password/set", {
         email,
+        token: setToken,
         password
       });
 
@@ -195,4 +202,3 @@ export default function InviteAcceptedPage() {
     </div>
   );
 }
-

@@ -20,7 +20,6 @@ export type CaseRowsListProps = {
   draftCaseTitle: string;
   setDraftCaseTitle: (s: string) => void;
   projectId: number;
-  dataVersion: number; // Used to force remount when data is reloaded
   groupMembers: AssigneeOption[];
 };
 
@@ -40,14 +39,13 @@ export default function CaseRowsList({
   draftCaseTitle,
   setDraftCaseTitle,
   projectId,
-  dataVersion,
   groupMembers,
 }: CaseRowsListProps) {
   return (
     <>
       {cases.map((testCase) => (
         <CaseRow
-          key={`${testCase.id}-${dataVersion}`}
+          key={testCase.id}
           c={testCase}
           cols={cols}
           onOpen={() => onOpenCase(testCase.id)}
@@ -63,7 +61,6 @@ export default function CaseRowsList({
           draftCaseTitle={draftCaseTitle}
           setDraftCaseTitle={setDraftCaseTitle}
           projectId={projectId}
-          dataVersion={dataVersion}
           groupMembers={groupMembers}
         />
       ))}

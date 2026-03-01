@@ -6,6 +6,7 @@ import type {
   MilestoneUpdate,
   RunSummary,
   MilestoneAddRunsPayload,
+  MilestoneStatusCount,
 } from "../model/types";
 
 
@@ -88,4 +89,12 @@ export async function removeRunFromMilestone(
   runId: number
 ): Promise<void> {
   await http.delete(`/api/milestones/${milestoneId}/runs/${runId}`);
+}
+
+/** GET /api/projects/{projectId}/milestones/stats */
+export async function listMilestoneStatusCounts(
+  projectId: number
+): Promise<MilestoneStatusCount[]> {
+  const { data } = await http.get(`/api/projects/${projectId}/milestones/stats`);
+  return data;
 }

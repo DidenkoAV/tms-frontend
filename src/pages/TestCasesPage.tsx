@@ -1,15 +1,16 @@
 // src/pages/TestCasesPage.tsx
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate, useParams, useLocation } from "react-router-dom";
 import { http } from "@/lib/http";
 
 // Entities (new structure)
 import { listAllProjects } from "@/entities/project";
-import type { Project } from "@/entities/project";
 import type { TestCase } from "@/entities/test-case";
 import {
   updateCase as apiUpdateCase,
   deleteCase as apiDeleteCase,
+  bulkArchiveCases as apiBulkArchiveCases,
+  listCasesPage,
 } from "@/entities/test-case";
 import { updateSuite as apiUpdateSuite, batchDeleteSuites } from "@/entities/test-suite";
 import { getGroupMembers } from "@/entities/group";
@@ -18,7 +19,7 @@ import { useConfirm, AlertBanner } from "@/shared/ui/alert";
 import { FolderIcon } from "@/shared/ui/icons";
 import { TestCasesHeader, CaseSuiteCard, ImportExportPanel, type CaseRowsListProps, CreateSuiteModal, type Suite } from "@/features/test-cases";
 import { JiraBatchProvider, useJiraBatch } from "@/features/integrations/jira/ui/JiraBatchContext";
-import { useMe } from "@/features/account";
+import { getJiraConnection } from "@/features/integrations/jira";
 
 /* Dynamic grid template based on visible columns */
 function buildGridTemplate(cols: Record<ColKey, boolean>): string {
@@ -39,7 +40,6 @@ function buildGridTemplate(cols: Record<ColKey, boolean>): string {
 
 /* localStorage keys */
 const COLS_KEY = "cases.columns";
-const SUITE_SORT_DIR_KEY = "cases.suiteSortDir";
 const CASE_SORT_DIR_KEY = "cases.caseSortDir";
 const CASE_SORT_PER_SUITE_KEY = "cases.caseSortPerSuite";
 
@@ -72,18 +72,12 @@ function TestCasesPageContent() {
     setTimeout(() => setBanner(null), 2600);
   }
 
-  const { me } = useMe();
-
-  const [project, setProject] = useState<Project | null>(null);
   const [suites, setSuites] = useState<Suite[]>([]);
   const [cases, setCases] = useState<TestCase[]>([]);
   const [groupMembers, setGroupMembers] = useState<GroupMemberSimple[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [hasJiraIntegration, setHasJiraIntegration] = useState(false);
   const [err, setErr] = useState<string | null>(null);
-
-  // Counter to force remount of CaseRow components when data is reloaded
-  // This ensures JiraIssuesInline reloads fresh data
-  const [dataVersion, setDataVersion] = useState(0);
+  const initialLocationLoadDone = useRef(false);
 
   const [openSuites, setOpenSuites] = useState<Record<string, boolean>>({
     project: false,
@@ -111,14 +105,6 @@ function TestCasesPageContent() {
     localStorage.setItem(COLS_KEY, JSON.stringify(cols));
   }, [cols]);
 
-  const [suiteSortDir, setSuiteSortDir] = useState<"asc" | "desc">(
-    (localStorage.getItem(SUITE_SORT_DIR_KEY) as any) || "asc"
-  );
-  useEffect(
-    () => localStorage.setItem(SUITE_SORT_DIR_KEY, suiteSortDir),
-    [suiteSortDir]
-  );
-
   const [defaultCaseSortDir, setDefaultCaseSortDir] = useState<"asc" | "desc">(
     (localStorage.getItem(CASE_SORT_DIR_KEY) as any) || "asc"
   );
@@ -145,7 +131,6 @@ function TestCasesPageContent() {
 
   const [editingSuiteId, setEditingSuiteId] = useState<number | null>(null);
   const [editSuiteName, setEditSuiteName] = useState("");
-  const [busyRename, setBusyRename] = useState(false);
 
   const [editingCaseId, setEditingCaseId] = useState<number | null>(null);
   const [draftCaseTitle, setDraftCaseTitle] = useState("");
@@ -153,6 +138,9 @@ function TestCasesPageContent() {
   const [showSuiteModal, setShowSuiteModal] = useState(false);
   const [parentSuiteForNew, setParentSuiteForNew] = useState<number | null>(null);
   const [q, setQ] = useState("");
+  const [page, setPage] = useState(0);
+  const [pageSize] = useState(100);
+  const [totalCases, setTotalCases] = useState(0);
   const [selectedSuites, setSelectedSuites] = useState<Set<number>>(new Set());
   const [selectedCases, setSelectedCases] = useState<Set<number>>(new Set());
 
@@ -162,8 +150,7 @@ function TestCasesPageContent() {
   }, [projectId, nav]);
 
   /* ========== LOAD PROJECT, SUITES, CASES ========== */
-  async function loadData() {
-    setLoading(true);
+  const loadData = useCallback(async () => {
     setErr(null);
     try {
       const all = await listAllProjects();
@@ -172,21 +159,28 @@ function TestCasesPageContent() {
         nav("/projects", { replace: true });
         return;
       }
-      setProject(p);
 
-      const [suitesRes, casesRes] = await Promise.all([
+      const [suitesRes, casesPage] = await Promise.all([
         http.get<Suite[]>(`/api/projects/${projectId}/suites`),
-        http.get<TestCase[]>(`/api/projects/${projectId}/cases`),
+        listCasesPage(projectId, {
+          q: q.trim() || undefined,
+          page,
+          size: pageSize,
+        }),
       ]);
 
       setSuites(suitesRes.data);
-      setCases(casesRes.data);
+      setCases(casesPage.items);
+      setTotalCases(casesPage.total);
 
       // Load group members for assignee dropdown
       // For both PERSONAL and SHARED groups, show all ACTIVE members
       // This allows assigning test cases to any team member
       // Use project's groupId, not the one from me
       const projectGroupId = p.groupId;
+      const jiraConnection = projectGroupId ? await getJiraConnection(projectGroupId) : null;
+      const jiraEnabled = Boolean(jiraConnection);
+      setHasJiraIntegration(jiraEnabled);
 
       if (projectGroupId) {
         try {
@@ -211,31 +205,30 @@ function TestCasesPageContent() {
 
       // Load Jira issues for all cases in batch (if Jira column is visible)
       // Use project's groupId, not projectId
-      if (cols.jira && casesRes.data.length > 0 && p.groupId) {
-        const caseIds = casesRes.data.map(c => c.id);
+      if (jiraEnabled && cols.jira && casesPage.items.length > 0 && p.groupId) {
+        const caseIds = casesPage.items.map(c => c.id);
         await jiraBatch.loadBatch(p.groupId, caseIds);
       }
-
-      // Increment version to force remount of CaseRow components
-      // This ensures JiraIssuesInline reloads fresh data
-      setDataVersion(v => v + 1);
     } catch (e: any) {
       setErr(e?.response?.data?.message || "Failed to load project");
-    } finally {
-      setLoading(false);
     }
-  }
+  }, [projectId, nav, cols.jira, jiraBatch, q, page, pageSize]);
 
   useEffect(() => {
     if (!Number.isFinite(projectId) || projectId <= 0) return;
     loadData();
-  }, [projectId]);
+  }, [projectId, loadData]);
 
   // Reload data when returning to this page (e.g., after navigating back from case details)
   // location.key changes on every navigation, so we reload data
   useEffect(() => {
     if (!Number.isFinite(projectId) || projectId <= 0) return;
+    if (!initialLocationLoadDone.current) {
+      initialLocationLoadDone.current = true;
+      return;
+    }
     loadData();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [location.key]);
 
   /* ========== SORTING, GROUPING ========== */
@@ -247,11 +240,20 @@ function TestCasesPageContent() {
     return arr;
   }, [suites]);
 
+  const suitesByParent = useMemo(() => {
+    const map = new Map<number, Suite[]>();
+    for (const suite of suitesSorted) {
+      if (suite.parentId == null) continue;
+      const current = map.get(suite.parentId);
+      if (current) current.push(suite);
+      else map.set(suite.parentId, [suite]);
+    }
+    return map;
+  }, [suitesSorted]);
+
   const grouped = useMemo(() => {
-    const s = q.trim().toLowerCase();
     const map = new Map<string, TestCase[]>();
     for (const c of cases) {
-      if (s && !(c.title || "").toLowerCase().includes(s)) continue;
       const key = c.suiteId ? String(c.suiteId) : "project";
       const arr = map.get(key);
       if (arr) arr.push(c);
@@ -260,7 +262,7 @@ function TestCasesPageContent() {
     // No automatic sorting - keep server order
     if (!map.has("project")) map.set("project", []);
     return map;
-  }, [cases, q]);
+  }, [cases]);
 
   // Build suite hierarchy: only root suites (depth 0 or no parent)
   const rootSuites = useMemo(() => {
@@ -269,8 +271,30 @@ function TestCasesPageContent() {
 
   // Get children for a suite
   const getChildSuites = (parentId: number): Suite[] => {
-    return suitesSorted.filter(s => s.parentId === parentId);
+    return suitesByParent.get(parentId) ?? [];
   };
+
+  const caseCountBySuite = useMemo(() => {
+    const directCount = new Map<number, number>();
+    for (const [suiteKey, suiteCases] of grouped.entries()) {
+      if (suiteKey === "project") continue;
+      directCount.set(Number(suiteKey), suiteCases.length);
+    }
+
+    const totalCount = new Map<number, number>();
+    const computeTotal = (suiteId: number): number => {
+      const cached = totalCount.get(suiteId);
+      if (typeof cached === "number") return cached;
+      const base = directCount.get(suiteId) ?? 0;
+      const children = getChildSuites(suiteId);
+      const total = base + children.reduce((sum, child) => sum + computeTotal(child.id), 0);
+      totalCount.set(suiteId, total);
+      return total;
+    };
+
+    for (const suite of suitesSorted) computeTotal(suite.id);
+    return totalCount;
+  }, [grouped, suitesSorted, suitesByParent]);
 
   const suitesToRender = useMemo(() => {
     const s = q.trim();
@@ -329,7 +353,6 @@ function TestCasesPageContent() {
       cancelRename();
       return;
     }
-    setBusyRename(true);
     try {
       const updated = await apiUpdateSuite(editingSuiteId, { name: newName });
       setSuites((prev) =>
@@ -338,8 +361,6 @@ function TestCasesPageContent() {
       cancelRename();
     } catch (e: any) {
       alertMsg(e?.response?.data?.message || "Failed to rename suite");
-    } finally {
-      setBusyRename(false);
     }
   };
 
@@ -390,11 +411,12 @@ function TestCasesPageContent() {
   const deleteSingleCase = (id: number) => {
     const c = cases.find((x) => x.id === id);
     confirm.open(
-      `Delete case �${c?.title || `#${id}`}�? This cannot be undone.`,
+      `Delete case "${c?.title || `#${id}`}"? This cannot be undone.`,
       async () => {
         try {
           await apiDeleteCase(id);
           setCases((prev) => prev.filter((x) => x.id !== id));
+          setTotalCases((prev) => Math.max(0, prev - 1));
           setSelectedCases((prev) => {
             const ns = new Set(prev);
             ns.delete(id);
@@ -521,13 +543,17 @@ function TestCasesPageContent() {
         }
       }
 
-      // Delete cases one by one
-      for (const cid of caseIds) {
+      // Delete cases in one request
+      if (caseIds.length > 0) {
         try {
-          await apiDeleteCase(cid);
-          setCases((prev) => prev.filter((c) => c.id !== cid));
+          const result = await apiBulkArchiveCases(projectId, caseIds);
+          const deletedSet = new Set(caseIds);
+          setCases((prev) => prev.filter((c) => !deletedSet.has(c.id)));
+          setTotalCases((prev) => Math.max(0, prev - result.deletedCount));
+          alertMsg(`Deleted ${result.deletedCount} case(s)`, "info");
+          await loadData();
         } catch (e: any) {
-          alertMsg(e?.response?.data?.message || `Failed to delete case #${cid}`);
+          alertMsg(e?.response?.data?.message || "Failed to delete cases");
         }
       }
     });
@@ -546,9 +572,13 @@ function TestCasesPageContent() {
   /* ========== RENDER ========== */
   const projectCases = grouped.get("project") ?? [];
   const projectSortDir = caseSortPerSuite["project"] || defaultCaseSortDir;
+  const totalPages = Math.max(1, Math.ceil(totalCases / pageSize));
+  const canPrevPage = page > 0;
+  const canNextPage = page + 1 < totalPages;
+  const effectiveCols = hasJiraIntegration ? cols : { ...cols, jira: false };
 
   // Build dynamic grid template based on visible columns
-  const gridTemplate = buildGridTemplate(cols);
+  const gridTemplate = buildGridTemplate(effectiveCols);
 
   const caseRowsProps: Omit<CaseRowsListProps, "cases" | "cols" | "gridTemplate"> = {
     selectedCases,
@@ -563,7 +593,6 @@ function TestCasesPageContent() {
     draftCaseTitle,
     setDraftCaseTitle,
     projectId,
-    dataVersion,
     groupMembers: groupMembers.map(m => ({
       userId: m.userId,
       name: m.fullName,
@@ -586,9 +615,13 @@ function TestCasesPageContent() {
       {/* Header */}
       <TestCasesHeader
         q={q}
-        onSearch={setQ}
+        onSearch={(value) => {
+          setPage(0);
+          setQ(value);
+        }}
         cols={cols}
         setCols={setCols}
+        jiraEnabled={hasJiraIntegration}
         selectedSuites={selectedSuites}
         selectedCases={selectedCases}
         onBulkDelete={bulkDelete}
@@ -628,7 +661,7 @@ function TestCasesPageContent() {
             onToggleSort={() => toggleSuiteSortDirection("project")}
             onDragOver={allowDrop("project")}
             onDrop={dropTo("project")}
-            cols={cols}
+            cols={effectiveCols}
             cases={projectCases}
             gridTemplate={gridTemplate}
             suiteSelectable={false}
@@ -641,14 +674,6 @@ function TestCasesPageContent() {
         )}
 
         {suitesToRender.map((suite) => {
-          // Calculate total cases including nested suites recursively
-          const getTotalCasesCount = (suiteId: number): number => {
-            const directCases = grouped.get(String(suiteId)) ?? [];
-            const children = getChildSuites(suiteId);
-            const childrenCases = children.reduce((sum, child) => sum + getTotalCasesCount(child.id), 0);
-            return directCases.length + childrenCases;
-          };
-
           const renderSuiteWithChildren = (s: Suite): React.ReactElement => {
             const suiteKey = String(s.id);
             const suiteCases = grouped.get(suiteKey) ?? [];
@@ -662,7 +687,7 @@ function TestCasesPageContent() {
             const childSuites = getChildSuites(s.id);
 
             const hasCases = suiteCases.length > 0;
-            const totalCasesCount = getTotalCasesCount(s.id);
+            const totalCasesCount = caseCountBySuite.get(s.id) ?? suiteCases.length;
 
             // Build display title - always show just the suite name
             const displayTitle = s.name;
@@ -687,7 +712,7 @@ function TestCasesPageContent() {
                   onToggleSort={() => toggleSuiteSortDirection(suiteKey)}
                   onDragOver={allowDrop(suiteKey)}
                   onDrop={dropTo(suiteKey)}
-                  cols={cols}
+                  cols={effectiveCols}
                   cases={suiteCases}
                   gridTemplate={gridTemplate}
                   suiteSelectable
@@ -722,6 +747,33 @@ function TestCasesPageContent() {
           return renderSuiteWithChildren(suite);
         })}
       </section>
+
+      <div className="flex items-center justify-between mt-6">
+        <div className="text-xs text-slate-500 dark:text-slate-400">
+          Showing {cases.length} of {totalCases} case(s)
+        </div>
+        <div className="flex items-center gap-2">
+          <button
+            type="button"
+            disabled={!canPrevPage}
+            onClick={() => canPrevPage && setPage((p) => Math.max(0, p - 1))}
+            className="px-3 py-1.5 text-sm border rounded-lg border-slate-300 text-slate-700 disabled:opacity-50 dark:border-slate-700 dark:text-slate-200"
+          >
+            Prev
+          </button>
+          <span className="text-xs text-slate-600 dark:text-slate-300">
+            Page {Math.min(page + 1, totalPages)} / {totalPages}
+          </span>
+          <button
+            type="button"
+            disabled={!canNextPage}
+            onClick={() => canNextPage && setPage((p) => p + 1)}
+            className="px-3 py-1.5 text-sm border rounded-lg border-slate-300 text-slate-700 disabled:opacity-50 dark:border-slate-700 dark:text-slate-200"
+          >
+            Next
+          </button>
+        </div>
+      </div>
 
       {/* Create Suite */}
       {showSuiteModal && (

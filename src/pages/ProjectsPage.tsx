@@ -231,21 +231,23 @@ export default function ProjectsPage() {
     }
   };
 
-  const doDeleteProject = async (p: Project) => {
-    try {
-      await deleteProject(p.groupId!, p.id);
-      setItems((prev) => prev.filter((x) => x.id !== p.id));
-      setStats((prev) => {
-        const { [p.id]: _, ...rest } = prev;
-        return rest;
-      });
-    } catch (e: any) {
-      setBanner({
-        kind: "error",
-        text: e?.response?.data?.message || "Delete failed",
-      });
-      setTimeout(() => setBanner(null), 2500);
-    }
+  const doDeleteProject = (p: Project) => {
+    void (async () => {
+      try {
+        await deleteProject(p.groupId!, p.id);
+        setItems((prev) => prev.filter((x) => x.id !== p.id));
+        setStats((prev) => {
+          const { [p.id]: _, ...rest } = prev;
+          return rest;
+        });
+      } catch (e: any) {
+        setBanner({
+          kind: "error",
+          text: e?.response?.data?.message || "Delete failed",
+        });
+        setTimeout(() => setBanner(null), 2500);
+      }
+    })();
   };
 
   const bulkDelete = () => {

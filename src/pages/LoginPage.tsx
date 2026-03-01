@@ -1,6 +1,6 @@
 ﻿// src/pages/LoginPage.tsx
 import { useState, useEffect } from "react";
-import { http, setAuthToken } from "@/lib/http";
+import { ensureCsrfToken, http, setAuthToken } from "@/lib/http";
 import { useNavigate, Link } from "react-router-dom";
 import { useIsolatedTheme } from "@/shared/utils/useIsolatedTheme";
 
@@ -82,6 +82,7 @@ export default function LoginPage() {
     setErr(null);
     setLoading(true);
     try {
+      await ensureCsrfToken();
       const { data } = await http.post("/api/auth/login", { email, password });
       setAuthToken(data.token);
       // Force full page reload to ensure clean state after login

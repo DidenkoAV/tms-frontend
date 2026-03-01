@@ -56,3 +56,10 @@ export type RunSummary = {
 export type MilestoneAddRunsPayload = {
   runIds: number[];
 };
+
+/** Aggregated status counts for milestone */
+export type MilestoneStatusCount = {
+  milestoneId: number;
+  statusId: number;
+  count: number;
+};

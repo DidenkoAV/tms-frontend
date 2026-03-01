@@ -1,6 +1,7 @@
 // src/features/account/component/tokens/TokenRevealDialog.tsx
 import { useEffect } from "react";
 import { X, Copy } from "lucide-react";
+import { useToast } from "@/shared/ui/alert";
 
 export default function TokenRevealDialog({
   token,
@@ -9,17 +10,20 @@ export default function TokenRevealDialog({
   token: string;
   onClose: () => void;
 }) {
+  const toast = useToast();
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => e.key === "Escape" && onClose();
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
   }, [onClose]);
 
-  function copy(text: string, okMsg = "Copied") {
-    navigator.clipboard.writeText(text).then(
-      () => alert(okMsg),
-      () => alert("Copy failed")
-    );
+  async function copy(text: string, okMsg = "Copied") {
+    try {
+      await navigator.clipboard.writeText(text);
+      toast.success(okMsg);
+    } catch {
+      toast.error("Copy failed");
+    }
   }
 
   return (

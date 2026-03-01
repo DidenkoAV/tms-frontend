@@ -1,5 +1,5 @@
 // src/pages/MilestonePage.tsx
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 
 // Entities (new structure)
@@ -15,7 +15,7 @@ import type { Run, RunCase } from "@/entities/test-run";
 import { STATUS_ID } from "@/entities/test-result";
 
 /* shared ui */
-import { useConfirm, AlertBanner } from "@/shared/ui/alert";
+import { useConfirm, AlertBanner, useToast } from "@/shared/ui/alert";
 import SearchInput from "@/shared/ui/search/SearchInput";
 import TableHeaderActions from "@/shared/ui/table/TableHeaderActions";
 
@@ -50,6 +50,7 @@ export default function MilestonePage() {
   const mid = Number(milestoneId ?? NaN);
   const nav = useNavigate();
   const confirm = useConfirm();
+  const toast = useToast();
 
   const [milestone, setMilestone] = useState<Milestone | null>(null);
   const [runs, setRuns] = useState<Run[]>([]);
@@ -107,10 +108,17 @@ export default function MilestonePage() {
 
   const [q, setQ] = useState("");
 
+  useEffect(() => {
+    if (!Number.isFinite(projectId) || !Number.isFinite(mid)) {
+      nav("/projects", { replace: true });
+    }
+  }, [projectId, mid, nav]);
+
   /* load base data */
   useEffect(() => {
     let alive = true;
     (async () => {
+      if (!Number.isFinite(projectId) || !Number.isFinite(mid)) return;
       try {
         setLoading(true);
         setErr(null);
@@ -146,23 +154,30 @@ export default function MilestonePage() {
       }
       if (!cancelled) setRunStatsLoading(true);
       const validRuns = runs.filter(hasValidId);
-      const pairs: Array<[number, { counts: StatusCounts; total: number; passRate: number }]> = [];
-
-      for (const r of validRuns) {
-        const runId: number = r.id;
-        try {
-          const rc = await listRunCases(runId);
-          const counts: StatusCounts = { ...emptyCounts };
-          for (const row of rc as RunCase[]) {
-            const key = ID_TO_KEY(row.currentStatusId ?? null);
-            counts[key] += 1;
-          }
-          const total = (rc as RunCase[]).length;
-          const passRate = total ? counts.PASSED / total : 0;
-          pairs.push([runId, { counts, total, passRate }]);
-        } catch {
-          pairs.push([runId, { counts: { ...emptyCounts }, total: 0, passRate: 0 }]);
-        }
+      type RunStatsEntry = [number, { counts: StatusCounts; total: number; passRate: number }];
+      const pairs: RunStatsEntry[] = [];
+      const CONCURRENCY = 6;
+      for (let i = 0; i < validRuns.length; i += CONCURRENCY) {
+        const batch = validRuns.slice(i, i + CONCURRENCY);
+        const batchPairs: RunStatsEntry[] = await Promise.all(
+          batch.map(async (r) => {
+            const runId: number = r.id;
+            try {
+              const rc = await listRunCases(runId);
+              const counts: StatusCounts = { ...emptyCounts };
+              for (const row of rc as RunCase[]) {
+                const key = ID_TO_KEY(row.currentStatusId ?? null);
+                counts[key] += 1;
+              }
+              const total = (rc as RunCase[]).length;
+              const passRate = total ? counts.PASSED / total : 0;
+              return [runId, { counts, total, passRate }];
+            } catch {
+              return [runId, { counts: { ...emptyCounts }, total: 0, passRate: 0 }];
+            }
+          })
+        );
+        pairs.push(...batchPairs);
       }
       if (!cancelled) {
         setRunStats(Object.fromEntries(pairs));
@@ -194,7 +209,7 @@ export default function MilestonePage() {
   }, [projectRuns, runs]);
 
   /* ---------- ACTIONS ---------- */
-  async function addPicked() {
+  const addPicked = useCallback(async () => {
     if (!picked.length) return;
     try {
       const updated = await addRunsToMilestone(mid, picked);
@@ -202,42 +217,44 @@ export default function MilestonePage() {
       setPicked([]);
       setShowAdd(false);
     } catch (e: any) {
-      alert(e?.response?.data?.message || "Failed to add runs");
+      toast.error(e?.response?.data?.message || "Failed to add runs");
     }
-  }
+  }, [picked, mid, toast]);
 
-  function askRemoveRun(runId: number) {
+  const askRemoveRun = useCallback((runId: number) => {
     confirm.open("Remove this run from milestone?", async () => {
       try {
         await removeRunFromMilestone(mid, runId);
         setRuns((prev) => prev.filter((r) => r.id !== runId));
       } catch (e: any) {
-        alert(e?.response?.data?.message || "Failed to remove run");
+        toast.error(e?.response?.data?.message || "Failed to remove run");
       }
     });
-  }
+  }, [confirm, mid, toast]);
 
-  function askRemoveSelected() {
+  const askRemoveSelected = useCallback(() => {
     if (!selectedIds.size) return;
     confirm.open(`Remove ${selectedIds.size} runs from milestone?`, async () => {
       try {
-        for (const rid of selectedIds) {
-          await removeRunFromMilestone(mid, rid);
-        }
+        await Promise.all(
+          Array.from(selectedIds).map((rid) => removeRunFromMilestone(mid, rid))
+        );
         setRuns((prev) => prev.filter((r) => !selectedIds.has(r.id)));
         setSelectedIds(new Set());
       } catch (e: any) {
-        alert(e?.response?.data?.message || "Failed to remove selected runs");
+        toast.error(e?.response?.data?.message || "Failed to remove selected runs");
       }
     });
-  }
+  }, [confirm, mid, selectedIds, toast]);
 
   /* search filter */
   const filteredRuns = useMemo(() => {
+    const query = q.trim().toLowerCase();
+    if (!query) return runs;
     return runs.filter(
       (r) =>
-        (r.name || "").toLowerCase().includes(q.toLowerCase()) ||
-        (r.description || "").toLowerCase().includes(q.toLowerCase())
+        (r.name || "").toLowerCase().includes(query) ||
+        (r.description || "").toLowerCase().includes(query)
     );
   }, [runs, q]);
 
@@ -260,7 +277,11 @@ export default function MilestonePage() {
       }
     });
     return arr;
-  }, [filteredRuns, sortBy, sortDir, runStats, favorites]);
+  }, [filteredRuns, sortBy, sortDir, favorites]);
+
+  useEffect(() => {
+    setPage(1);
+  }, [q, pageSize]);
 
   /* pagination logic */
   const totalItems = sortedRuns.length;

@@ -38,6 +38,7 @@ export function AccountTabContent({ tab, me, setMe }: AccountTabContentProps) {
       {tab === "groups" && (
         <Card>
           <GroupsSection
+            me={me}
             CardHeader={CardHeader}
             Field={Field}
             Input={Input}
@@ -85,4 +86,3 @@ export function AccountTabContent({ tab, me, setMe }: AccountTabContentProps) {
     </section>
   );
 }
-

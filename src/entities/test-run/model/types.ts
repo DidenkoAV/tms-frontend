@@ -40,3 +40,9 @@ export type RunCase = {
 export type BulkResultResponse = {
   affected: number;
 };
+
+export type RunStatusCount = {
+  runId: number;
+  statusId: number;
+  count: number;
+};

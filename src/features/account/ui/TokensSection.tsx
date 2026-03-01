@@ -1,11 +1,12 @@
 // src/features/account/component/tokens/TokensSection.tsx
 import { useEffect, useState } from "react";
-import { http } from "@/lib/http";
 import type { TokenItem } from "@/entities/group";
+import { createToken as apiCreateToken, listTokens, revokeToken as apiRevokeToken } from "@/entities/group/api/groupApi";
 import TokenRevealDialog from "./TokenRevealDialog";
 import TokenCreateDialog from "./TokenCreateDialog";
 import TokenRevokeDialog from "./TokenRevokeDialog";
 import { Calendar, Clock, KeyRound } from "lucide-react";
+import { useToast } from "@/shared/ui/alert";
 
 type TokensSectionProps = {
   CardHeader: (props: { title: string; subtitle?: string; compact?: boolean }) => React.ReactElement;
@@ -18,19 +19,20 @@ export default function TokensSection({
   ButtonPrimary,
   ButtonDangerOutline,
 }: TokensSectionProps) {
+  const toast = useToast();
   const [tokens, setTokens] = useState<TokenItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [revealToken, setRevealToken] = useState<string | null>(null);
   const [showCreate, setShowCreate] = useState(false);
   const [toRevoke, setToRevoke] = useState<{ id: string; name: string } | null>(null);
 
-  async function loadTokens() {
+  async function loadTokens(force = false) {
     setLoading(true);
     try {
-      const r = await http.get("/api/auth/tokens");
-      setTokens(r.data || []);
+      const data = await listTokens(force);
+      setTokens(data || []);
     } catch (e: any) {
-      alert(e?.response?.data?.message || "Failed to load tokens");
+      toast.error(e?.response?.data?.message || "Failed to load tokens");
     } finally {
       setLoading(false);
     }
@@ -41,8 +43,7 @@ export default function TokensSection({
   }, []);
 
   async function createToken(name: string) {
-    const r = await http.post("/api/auth/tokens", { name: name.trim() });
-    const created: TokenItem = r.data;
+    const created: TokenItem = await apiCreateToken(name.trim());
     setTokens((prev) => [{ ...created, tokenOnce: undefined }, ...prev]);
     if (created.tokenOnce) setRevealToken(created.tokenOnce);
   }
@@ -70,7 +71,7 @@ export default function TokensSection({
         />
         <div className="flex items-center gap-2">
           <button
-            onClick={loadTokens}
+            onClick={() => loadTokens(true)}
             className="rounded-md border border-slate-300 bg-slate-100 px-3 py-1.5 text-xs font-medium text-slate-700 transition hover:bg-slate-200 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200 dark:hover:bg-slate-700"
           >
             Refresh
@@ -160,7 +161,7 @@ export default function TokensSection({
           name={toRevoke.name}
           onCancel={() => setToRevoke(null)}
           onConfirm={async () => {
-            await http.delete(`/api/auth/tokens/${toRevoke.id}`);
+            await apiRevokeToken(toRevoke.id);
             setTokens((p) => p.filter((t) => t.id !== toRevoke.id));
             setToRevoke(null);
           }}

@@ -10,13 +10,18 @@ import {
   addCasesToRun as addCasesToRunApi,
   listRunCases,
   getRun,
+  removeCaseFromRun,
+  removeCasesFromRun,
 } from "@/entities/test-run";
-import { listCases, updateCase as apiUpdateCase } from "@/entities/test-case";
+import {
+  listCases,
+  listCasesByIds,
+  updateCase as apiUpdateCase,
+} from "@/entities/test-case";
 import type { TestCase } from "@/entities/test-case";
 
 // Entities (new structure)
 import { addResult } from "@/entities/test-result";
-import { STATUS_ID } from "@/entities/test-result";
 
 import { useConfirm, AlertBanner } from "@/shared/ui/alert";
 import SearchInput from "@/shared/ui/search/SearchInput";
@@ -43,27 +48,8 @@ function IconBack() {
   );
 }
 
-/* ---------- statuses ---------- */
-type StatusKey = "PASSED" | "RETEST" | "FAILED" | "SKIPPED" | "BROKEN";
-const ID_TO_KEY = (id: number | null): StatusKey => {
-  if (id == null) return "SKIPPED";
-  const entry = (Object.keys(STATUS_ID) as StatusKey[]).find(
-    (k) => STATUS_ID[k] === id
-  );
-  return (entry || "SKIPPED") as StatusKey;
-};
-
 /* ---------- local ---------- */
 type Suite = { id: number; name: string; description?: string | null };
-
-type GroupSummary = {
-  id: number;
-  name: string;
-  personal: boolean;
-  ownerId: number;
-  ownerEmail: string;
-  membersCount: number;
-};
 
 const COLS_KEY = "run.visibleCols.v4";
 const HIDE_SUITES_KEY = "run.hideSuites";
@@ -107,6 +93,8 @@ function RunPageContent() {
   const [runCases, setRunCases] = useState<RunCase[]>([]);
   const [casesMap, setCasesMap] = useState<Record<number, TestCase>>({});
   const [allCases, setAllCases] = useState<TestCase[]>([]);
+  const [loadingAllCases, setLoadingAllCases] = useState(false);
+  const [showAdd, setShowAdd] = useState(false);
   const [suites, setSuites] = useState<Suite[]>([]);
   const [loading, setLoading] = useState(true);
   const [err, setErr] = useState<string | null>(null);
@@ -177,17 +165,12 @@ function RunPageContent() {
       setLoading(true);
       setErr(null);
       try {
-        const [allProjects, runRes, rc, allCasesRes, suitesRes, groupsRes] = await Promise.all([
+        const [allProjects, runRes, rc, suitesRes] = await Promise.all([
           listAllProjects(),
           getRun(rid),
           listRunCases(rid),
-          listCases(projectId, { size: 0 }),
           http
             .get<Suite[]>(`/api/projects/${projectId}/suites`)
-            .then((r) => r.data)
-            .catch(() => []),
-          http
-            .get<GroupSummary[]>(`/api/groups/my`)
             .then((r) => r.data)
             .catch(() => []),
         ]);
@@ -203,9 +186,11 @@ function RunPageContent() {
         setRun(runRes);
         setRunCases(rc);
 
-        const arr = (allCasesRes as TestCase[]) || [];
-        setAllCases(arr);
-        setCasesMap(Object.fromEntries(arr.map((c) => [c.id, c])));
+        const runCaseIds = Array.from(new Set(rc.map((item) => item.caseId)));
+        const runCasesMeta = await listCasesByIds(projectId, runCaseIds);
+        if (!alive) return;
+
+        setCasesMap(Object.fromEntries(runCasesMeta.map((c) => [c.id, c])));
         setSuites(suitesRes);
 
         // Load Jira issues for all cases in the run
@@ -226,6 +211,29 @@ function RunPageContent() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [projectId, rid, nav]);
 
+  useEffect(() => {
+    if (!showAdd || loadingAllCases || allCases.length > 0) return;
+
+    let alive = true;
+    (async () => {
+      setLoadingAllCases(true);
+      try {
+        const list = await listCases(projectId, { size: 0 });
+        if (!alive) return;
+        setAllCases((list as TestCase[]) || []);
+      } catch {
+        if (!alive) return;
+        notify("error", "Failed to load project cases");
+      } finally {
+        if (alive) setLoadingAllCases(false);
+      }
+    })();
+
+    return () => {
+      alive = false;
+    };
+  }, [showAdd, loadingAllCases, allCases.length, projectId]);
+
   /* ---------- Aggregations ---------- */
   const runCasesFiltered = useMemo(
     () => runCases.filter((rc) => !!casesMap[rc.caseId]),
@@ -235,15 +243,8 @@ function RunPageContent() {
   /* ---------- Pagination ---------- */
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(15);
-  const totalItems = runCasesFiltered.length;
-  const totalPages = Math.max(1, Math.ceil(totalItems / pageSize));
-  const pagedRunCases = useMemo(() => {
-    const start = (page - 1) * pageSize;
-    return runCasesFiltered.slice(start, start + pageSize);
-  }, [runCasesFiltered, page, pageSize]);
 
   /* ---------- Add & Remove ---------- */
-  const [showAdd, setShowAdd] = useState(false);
   async function addCasesToRun(caseIds: number[]) {
     const existing = new Set(runCases.map((rc) => rc.caseId));
     const unique = caseIds.filter((id) => !existing.has(id));
@@ -278,7 +279,7 @@ function RunPageContent() {
       `Remove "${title || `Case #${caseId}`}" from this run?`,
       async () => {
         try {
-          await http.delete(`/api/runs/${rid}/cases/${caseId}`);
+          await removeCaseFromRun(rid, caseId);
           setRunCases((prev) => prev.filter((x) => x.caseId !== caseId));
           notify("info", "Case removed");
         } catch (e: any) {
@@ -293,11 +294,7 @@ function RunPageContent() {
     const ids = Array.from(picked);
     confirm.open(`Remove ${ids.length} case(s)?`, async () => {
       try {
-        await Promise.all(
-          ids.map((cid) =>
-            http.delete(`/api/runs/${rid}/cases/${cid}`).catch(() => {})
-          )
-        );
+        await removeCasesFromRun(rid, ids);
         const fresh = await listRunCases(rid);
         setRunCases(fresh);
         setPicked(new Set());
@@ -326,11 +323,27 @@ function RunPageContent() {
     return arr;
   }, [runCasesFiltered, q, casesMap]);
 
+  const totalItems = filtered.length;
+  const effectivePageSize = pageSize > 0 ? pageSize : Math.max(totalItems, 1);
+  const totalPages = Math.max(1, Math.ceil(totalItems / effectivePageSize));
+  const safePage = Math.min(page, totalPages);
+  const pagedFiltered = useMemo(() => {
+    if (pageSize === 0) return filtered;
+    const start = (safePage - 1) * effectivePageSize;
+    return filtered.slice(start, start + effectivePageSize);
+  }, [filtered, pageSize, safePage, effectivePageSize]);
+
+  useEffect(() => {
+    if (page !== safePage) {
+      setPage(safePage);
+    }
+  }, [page, safePage]);
+
   const groups = useMemo(() => {
     if (hideSuites)
-      return [{ id: null as number | null, name: "All cases", items: filtered }];
+      return [{ id: null as number | null, name: "All cases", items: pagedFiltered }];
     const bySuite = new Map<number | null, RunCase[]>();
-    for (const rc of filtered) {
+    for (const rc of pagedFiltered) {
       const sid = casesMap[rc.caseId]?.suiteId ?? null;
       if (!bySuite.has(sid)) bySuite.set(sid, []);
       bySuite.get(sid)!.push(rc);
@@ -344,7 +357,7 @@ function RunPageContent() {
         items,
       }))
       .sort((a, b) => a.name.localeCompare(b.name));
-  }, [filtered, casesMap, suites, hideSuites]);
+  }, [pagedFiltered, casesMap, suites, hideSuites]);
 
   const tableColCount =
     3 +
@@ -455,7 +468,8 @@ function RunPageContent() {
           }}
           suites={suites}
           allCases={allCases}
-          alreadyInRun={new Set(runCasesFiltered.map((r) => r.caseId))}
+          loading={loadingAllCases}
+          alreadyInRun={new Set(runCases.map((r) => r.caseId))}
         />
       )}
 

@@ -1,5 +1,4 @@
-import { useMe } from "@/features/account";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   Link,
   useNavigate,
@@ -23,7 +22,6 @@ import {
   AUTO_STATUS_TO_LABEL,
   AUTO_LABEL_TO_STATUS,
 } from "@/entities/test-case";
-import { listRunCases } from "@/entities/test-run";
 import { AlertBanner } from "@/shared/ui/alert";
 import { parseDuration, formatDuration } from "@/shared/utils/duration";
 import { MarkdownBlock } from "@/shared/ui/markdown/TinyMarkdown";
@@ -60,17 +58,34 @@ export default function CaseViewPage() {
   const projectId = Number(id ?? NaN);
   const viewId = Number(caseId ?? NaN);
   const nav = useNavigate();
-  const { me } = useMe();
 
   type BannerKind = "info" | "error" | "success" | "warning";
   const [banner, setBanner] = useState<{
     kind: BannerKind;
     text: string;
   } | null>(null);
-  const notify = (kind: BannerKind, text: string, ms = 2400) => {
+  const bannerTimerRef = useRef<number | null>(null);
+  const notify = useCallback((kind: BannerKind, text: string, ms = 2400) => {
     setBanner({ kind, text });
-    if (ms) setTimeout(() => setBanner(null), ms);
-  };
+    if (bannerTimerRef.current) {
+      window.clearTimeout(bannerTimerRef.current);
+      bannerTimerRef.current = null;
+    }
+    if (ms) {
+      bannerTimerRef.current = window.setTimeout(() => {
+        setBanner(null);
+        bannerTimerRef.current = null;
+      }, ms);
+    }
+  }, []);
+
+  useEffect(() => {
+    return () => {
+      if (bannerTimerRef.current) {
+        window.clearTimeout(bannerTimerRef.current);
+      }
+    };
+  }, []);
 
   // ===== detect "from run" context =====
   const location = useLocation();
@@ -121,15 +136,13 @@ export default function CaseViewPage() {
   const [draftEstimate, setDraftEstimate] = useState<string>("");
   const [metaReady, setMetaReady] = useState(false);
 
-  // run status
-  const [runStatusId, setRunStatusId] = useState<number | null>(null);
-  const [commentsRefreshTick, setCommentsRefreshTick] = useState(0);
-
   // autotest mapping
   const [mappingFields, setMappingFields] = useState<MappingField[]>([]);
   const [savingMapping, setSavingMapping] = useState(false);
+  const metaSaveTimer = useRef<number | null>(null);
+  const lastSavedMetaPayloadRef = useRef<string>("");
 
-  async function saveMapping() {
+  const saveMapping = useCallback(async () => {
     if (!item) return;
     setSavingMapping(true);
     try {
@@ -147,7 +160,7 @@ export default function CaseViewPage() {
     } finally {
       setSavingMapping(false);
     }
-  }
+  }, [item, mappingFields, notify]);
 
   // ===== Load case + suites =====
   useEffect(() => {
@@ -170,9 +183,7 @@ export default function CaseViewPage() {
 
         // Find and set project to get groupId
         const proj = allProjects.find((p) => p.id === projectId);
-        if (proj) {
-          setProject({ id: proj.id, groupId: proj.groupId });
-        }
+        setProject(proj ? { id: proj.id, groupId: proj.groupId } : null);
 
         setSuites(suitesRes);
         setItem(caseRes);
@@ -196,8 +207,22 @@ export default function CaseViewPage() {
           AUTO_STATUS_TO_LABEL[caseRes.automationStatus ?? "NOT_AUTOMATED"] ??
             "Manual"
         );
-        setDraftTags((caseRes.tags ?? []).map((t) => t.trim()).filter(Boolean));
-        setDraftEstimate(formatDuration(caseRes.estimateSeconds));
+        const normalizedTags = (caseRes.tags ?? [])
+          .map((t) => t.trim())
+          .filter(Boolean);
+        const estimateText = formatDuration(caseRes.estimateSeconds);
+        setDraftTags(normalizedTags);
+        setDraftEstimate(estimateText);
+        lastSavedMetaPayloadRef.current = JSON.stringify({
+          priorityId: caseRes.priorityId ?? 2,
+          typeId: caseRes.typeId ?? 1,
+          automationStatus: caseRes.automationStatus ?? "NOT_AUTOMATED",
+          tags: normalizedTags,
+          estimateSeconds: (() => {
+            const n = parseDuration(estimateText);
+            return estimateText.trim() === "" ? null : n ?? 0;
+          })(),
+        });
 
         // autotest mapping init
         const map = caseRes.autotestMapping ?? {};
@@ -221,27 +246,7 @@ export default function CaseViewPage() {
     };
   }, [projectId, viewId, nav]);
 
-  // ===== Load run status (if run context) =====
-  useEffect(() => {
-    if (!inRunContext || !activeRunId || !item?.id) return;
-    let alive = true;
-    (async () => {
-      try {
-        const rcList = await listRunCases(activeRunId);
-        if (!alive) return;
-        const rc = rcList.find((r) => r.caseId === item.id);
-        setRunStatusId(rc?.currentStatusId ?? null);
-      } catch {
-        /* ignore */
-      }
-    })();
-    return () => {
-      alive = false;
-    };
-  }, [inRunContext, activeRunId, item?.id]);
-
   // ===== Auto-save meta =====
-  const metaSaveTimer = useRef<number | null>(null);
   useEffect(() => {
     if (!item || !metaReady) return;
     const payload = {
@@ -254,15 +259,17 @@ export default function CaseViewPage() {
         return draftEstimate.trim() === "" ? null : n ?? 0;
       })(),
     };
+    const payloadKey = JSON.stringify(payload);
+    if (payloadKey === lastSavedMetaPayloadRef.current) return;
     if (metaSaveTimer.current) window.clearTimeout(metaSaveTimer.current);
     metaSaveTimer.current = window.setTimeout(async () => {
       try {
-        const updated = await updateCase(item.id, payload);
-        setItem(updated);
+        await updateCase(item.id, payload);
+        lastSavedMetaPayloadRef.current = payloadKey;
       } catch (e) {
         console.error("Auto-save meta failed", e);
       }
-    }, 500) as unknown as number;
+    }, 900) as unknown as number;
     return () => {
       if (metaSaveTimer.current) window.clearTimeout(metaSaveTimer.current);
     };
@@ -293,7 +300,7 @@ export default function CaseViewPage() {
     inRunContext && activeRunId ? "Back to run" : "Back to test cases";
 
   /* ===== Save handlers ===== */
-  async function savePre() {
+  const savePre = useCallback(async () => {
     if (!item) return;
     const preconditions = draftPre.trim();
 
@@ -315,9 +322,9 @@ export default function CaseViewPage() {
     } finally {
       setSavingPre(false);
     }
-  }
+  }, [item, draftPre, notify]);
 
-  async function saveSteps() {
+  const saveSteps = useCallback(async () => {
     if (!item) return;
     setSavingSteps(true);
     try {
@@ -335,9 +342,9 @@ export default function CaseViewPage() {
     } finally {
       setSavingSteps(false);
     }
-  }
+  }, [item, draftSteps, notify]);
 
-  async function saveExp() {
+  const saveExp = useCallback(async () => {
     if (!item) return;
     const v = draftExp.trim();
     try {
@@ -353,9 +360,9 @@ export default function CaseViewPage() {
         e?.response?.data?.message || "Failed to save expected result"
       );
     }
-  }
+  }, [item, draftExp, notify]);
 
-  async function saveAct() {
+  const saveAct = useCallback(async () => {
     if (!item) return;
     const v = draftAct.trim();
     try {
@@ -371,9 +378,9 @@ export default function CaseViewPage() {
         e?.response?.data?.message || "Failed to save actual result"
       );
     }
-  }
+  }, [item, draftAct, notify]);
 
-  async function saveData() {
+  const saveData = useCallback(async () => {
     if (!item) return;
     const v = draftData.trim();
     try {
@@ -386,7 +393,13 @@ export default function CaseViewPage() {
     } catch (e: any) {
       notify("error", e?.response?.data?.message || "Failed to save test data");
     }
-  }
+  }, [item, draftData, notify]);
+
+  const onRunStatusChange = useCallback((id: number) => {
+    if (typeof id === "number") {
+      notify("success", "Status updated");
+    }
+  }, [notify]);
 
   /* ===== Render ===== */
   return (
@@ -620,11 +633,7 @@ export default function CaseViewPage() {
                 <RunComments
                   runId={activeRunId}
                   caseId={item.id}
-                  refreshTick={commentsRefreshTick}
-                  onStatusChange={(id) => {
-                    setRunStatusId(typeof id === "number" ? id : null);
-                    notify("success", "Status updated");
-                  }}
+                  onStatusChange={onRunStatusChange}
                   notify={notify}
                 />
               </div>

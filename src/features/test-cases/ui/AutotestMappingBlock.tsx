@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { memo, useState } from "react";
 import { PlusIcon, TrashIcon, SaveIcon, EditIcon } from "lucide-react";
 
 interface MappingField {
@@ -15,7 +15,7 @@ interface Props {
   defaultEditing?: boolean;
 }
 
-export default function AutotestMappingBlock({
+function AutotestMappingBlock({
   fields,
   onChange,
   onSave,
@@ -145,3 +145,5 @@ export default function AutotestMappingBlock({
     </div>
   );
 }
+
+export default memo(AutotestMappingBlock);

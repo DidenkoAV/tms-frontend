@@ -3,12 +3,12 @@ import { useEffect, useMemo, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 
 // Entities (new structure)
-import { listAllProjects } from "@/entities/project";
 import {
+  archiveRunsBulk,
   createRun,
   deleteRun,
   listRuns,
-  listRunCases,
+  listRunStatusCounts,
   updateRun,
 } from "@/entities/test-run";
 import type { Run } from "@/entities/test-run";
@@ -40,8 +40,6 @@ export default function RunsPage() {
   /* --- Pagination --- */
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(12);
-  const totalItems = items.length;
-  const totalPages = Math.max(1, Math.ceil(totalItems / pageSize));
 
   /* --- Columns --- */
   const [cols, setCols] = useState<VisibleCols>(() => {
@@ -67,6 +65,14 @@ export default function RunsPage() {
       return new Set();
     }
   });
+  useEffect(() => {
+    try {
+      const raw = localStorage.getItem(FAV_KEY);
+      setFavorites(new Set<number>(raw ? (JSON.parse(raw) as number[]) : []));
+    } catch {
+      setFavorites(new Set());
+    }
+  }, [FAV_KEY]);
   useEffect(() => {
     localStorage.setItem(FAV_KEY, JSON.stringify(Array.from(favorites)));
   }, [favorites]);
@@ -140,7 +146,7 @@ export default function RunsPage() {
 
   /* --- Deletion --- */
   const doDeleteRun = (run: Run) => {
-    confirmDlg.open(`Delete run "${run.name}"?`, async () => {
+    void (async () => {
       try {
         await deleteRun(run.id);
         setItems((prev) => prev.filter((r) => r.id !== run.id));
@@ -148,7 +154,7 @@ export default function RunsPage() {
       } catch (e: any) {
         notify("error", e?.response?.data?.message || "Delete failed");
       }
-    });
+    })();
   };
 
   /* --- Change status Open / Closed --- */
@@ -180,12 +186,6 @@ export default function RunsPage() {
       setLoading(true);
       setErr(null);
       try {
-        const all = await listAllProjects();
-        const p = all.find((x) => x.id === projectId);
-        if (!p) {
-          if (alive) nav("/projects", { replace: true });
-          return;
-        }
         const runs = await listRuns(projectId);
         if (alive) setItems(runs);
       } catch (e: any) {
@@ -217,8 +217,11 @@ export default function RunsPage() {
     }
   }
 
+  const runIds = useMemo(() => items.map((r) => r.id).sort((a, b) => a - b), [items]);
+  const runIdsKey = useMemo(() => runIds.join(","), [runIds]);
+
   useEffect(() => {
-    if (!items.length) {
+    if (!runIds.length) {
       setStats({});
       setStatsLoading(false);
       return;
@@ -226,48 +229,72 @@ export default function RunsPage() {
     let alive = true;
     setStatsLoading(true);
     (async () => {
-      const entries = await Promise.all(
-        items.map(async (r) => {
-          try {
-            const list = await listRunCases(r.id);
-            const counts: RunStats["counts"] = {
-              PASSED: 0,
-              RETEST: 0,
-              FAILED: 0,
-              SKIPPED: 0,
-              BROKEN: 0,
-            };
-            for (const rc of list) counts[idToKey(rc.currentStatusId ?? 0)]++;
-            const total = list.length;
-            const passRate = total ? counts.PASSED / total : 0;
-            return [r.id, { total, counts, passRate } as RunStats] as const;
-          } catch {
-            return [
-              r.id,
-              {
-                total: 0,
-                counts: {
-                  PASSED: 0,
-                  RETEST: 0,
-                  FAILED: 0,
-                  SKIPPED: 0,
-                  BROKEN: 0,
-                },
-                passRate: 0,
+      try {
+        const rows = await listRunStatusCounts(projectId);
+        if (!alive) return;
+
+        const initial = Object.fromEntries(
+          runIds.map((runId) => [
+            runId,
+            {
+              total: 0,
+              counts: {
+                PASSED: 0,
+                RETEST: 0,
+                FAILED: 0,
+                SKIPPED: 0,
+                BROKEN: 0,
               },
-            ] as const;
-          }
-        })
-      );
-      if (alive) {
-        setStats(Object.fromEntries(entries));
-        setStatsLoading(false);
+              passRate: 0,
+            } as RunStats,
+          ])
+        ) as Record<number, RunStats>;
+
+        for (const row of rows) {
+          const bucket = initial[row.runId];
+          if (!bucket) continue;
+          const key = idToKey(row.statusId);
+          bucket.counts[key] += row.count;
+          bucket.total += row.count;
+        }
+
+        for (const runId of Object.keys(initial)) {
+          const stat = initial[Number(runId)];
+          stat.passRate = stat.total ? stat.counts.PASSED / stat.total : 0;
+        }
+
+        setStats(initial);
+      } catch {
+        if (alive) {
+          setStats(
+            Object.fromEntries(
+              runIds.map((runId) => [
+                runId,
+                {
+                  total: 0,
+                  counts: {
+                    PASSED: 0,
+                    RETEST: 0,
+                    FAILED: 0,
+                    SKIPPED: 0,
+                    BROKEN: 0,
+                  },
+                  passRate: 0,
+                } as RunStats,
+              ])
+            )
+          );
+        }
+      } finally {
+        if (alive) {
+          setStatsLoading(false);
+        }
       }
     })();
     return () => {
       alive = false;
     };
-  }, [items]);
+  }, [projectId, runIdsKey]);
 
   /* --- Filtering and sorting --- */
   const [q, setQ] = useState("");
@@ -309,12 +336,24 @@ export default function RunsPage() {
     return arr;
   }, [filtered, favorites, stats, sortBy, sortDir, freezeSort]);
 
-  const paged = useMemo(() => {
-    const start = (page - 1) * pageSize;
-    return sorted.slice(start, start + pageSize);
-  }, [sorted, page, pageSize]);
+  const totalItems = sorted.length;
+  const effectivePageSize = pageSize > 0 ? pageSize : Math.max(totalItems, 1);
+  const totalPages = Math.max(1, Math.ceil(totalItems / effectivePageSize));
+  const safePage = Math.min(page, totalPages);
 
-  const needPad = sorted.length > 0 && sorted.length < 8;
+  const paged = useMemo(() => {
+    if (pageSize === 0) return sorted;
+    const start = (safePage - 1) * effectivePageSize;
+    return sorted.slice(start, start + effectivePageSize);
+  }, [sorted, pageSize, safePage, effectivePageSize]);
+
+  useEffect(() => {
+    if (page !== safePage) {
+      setPage(safePage);
+    }
+  }, [page, safePage]);
+
+  const needPad = paged.length > 0 && paged.length < 8;
 
   /* ----------------------- Render ----------------------- */
   return (
@@ -330,7 +369,21 @@ export default function RunsPage() {
       <RunsHeader
         totalItems={items.length}
         selectedCount={selected.size}
-        onBulkDelete={() => setSelected(new Set())}
+        onBulkDelete={() => {
+          const ids = Array.from(selected);
+          if (!ids.length) return;
+          confirmDlg.open(`Delete ${ids.length} run(s)?`, async () => {
+            try {
+              await archiveRunsBulk(ids);
+              const selectedSet = new Set(ids);
+              setItems((prev) => prev.filter((r) => !selectedSet.has(r.id)));
+              setSelected(new Set());
+              notify("info", `Deleted ${ids.length} run(s)`);
+            } catch (e: any) {
+              notify("error", e?.response?.data?.message || "Bulk delete failed");
+            }
+          });
+        }}
         onNewRun={() => setCreateOpen(true)}
         cols={cols}
         setCols={setCols}

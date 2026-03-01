@@ -19,6 +19,7 @@ interface Props {
   totalSuites?: number;
   totalCases?: number;
   onNewSuite: () => void;
+  jiraEnabled?: boolean;
 
   extraRight?: ReactNode;
 }
@@ -36,6 +37,7 @@ export default function TestCasesHeader({
   totalSuites = 0,
   totalCases = 0,
   onNewSuite,
+  jiraEnabled = true,
   extraRight,
 }: Props) {
   const selectedCount = selectedSuites.size + selectedCases.size;
@@ -43,15 +45,20 @@ export default function TestCasesHeader({
   const allSelected = totalCount > 0 && selectedCount === totalCount;
 
   const colItems = useMemo(
-    () => [
-      { key: "priority", label: "Priority" },
-      { key: "type", label: "Type" },
-      { key: "automation", label: "Automation" },
-      { key: "author", label: "Author" },
-      { key: "assigned", label: "Assigned" },
-      { key: "jira", label: "Jira" },
-    ],
-    []
+    () => {
+      const base = [
+        { key: "priority", label: "Priority" },
+        { key: "type", label: "Type" },
+        { key: "automation", label: "Automation" },
+        { key: "author", label: "Author" },
+        { key: "assigned", label: "Assigned" },
+      ];
+      if (jiraEnabled) {
+        base.push({ key: "jira", label: "Jira" });
+      }
+      return base;
+    },
+    [jiraEnabled]
   );
 
   return (

@@ -25,10 +25,6 @@ export async function addResult(
   caseId: number,
   payload: RunCaseResultCreate
 ): Promise<RunCaseResult> {
-  console.log("=== Sending result payload ===");
-  console.log("URL:", `/api/runs/${runId}/cases/${caseId}/results`);
-  console.log("Body:", JSON.stringify(payload, null, 2));
-
   const { data } = await http.post(
     `/api/runs/${runId}/cases/${caseId}/results`,
     payload

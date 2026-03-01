@@ -1,9 +1,22 @@
 ﻿import { http } from "@/lib/http";
-import type { Run, RunCreate, RunUpdate, RunCase, BulkResultResponse } from "../model/types";
+import type {
+  Run,
+  RunCreate,
+  RunUpdate,
+  RunCase,
+  BulkResultResponse,
+  RunStatusCount,
+} from "../model/types";
 
 /** List of project runs */
 export async function listRuns(projectId: number): Promise<Run[]> {
   const { data } = await http.get(`/api/projects/${projectId}/runs`);
+  return data;
+}
+
+/** Aggregated run status counts for project runs */
+export async function listRunStatusCounts(projectId: number): Promise<RunStatusCount[]> {
+  const { data } = await http.get(`/api/projects/${projectId}/runs/stats`);
   return data;
 }
 

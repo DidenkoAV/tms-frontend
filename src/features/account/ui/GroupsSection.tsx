@@ -1,7 +1,6 @@
 // src/features/account/component/groups/GroupsSection.tsx
 import { useEffect, useMemo, useState } from "react";
-import { http } from "@/lib/http";
-import type { GroupDetails, GroupMember, GroupRole, GroupType } from "@/entities/group";
+import type { GroupDetails, GroupMember, GroupRole, GroupType, Me } from "@/entities/group";
 import {
   listMyGroups,
   getGroup,
@@ -17,6 +16,7 @@ import {
 } from "@/entities/group/api/groupApi";
 
 type Props = {
+  me: Me | null;
   CardHeader: React.FC<{ title: string; subtitle?: string; compact?: boolean }>;
   Field: React.FC<{ label: string; children: React.ReactNode }>;
   Input: React.FC<React.InputHTMLAttributes<HTMLInputElement>>;
@@ -27,6 +27,7 @@ type Props = {
 type ApiErr = string | null;
 
 export default function GroupsSection({
+  me,
   CardHeader,
   Field,
   Input,
@@ -49,8 +50,7 @@ export default function GroupsSection({
   const [renameValue, setRenameValue] = useState("");
   const [editingName, setEditingName] = useState(false);
 
-  // me
-  const [myEmail, setMyEmail] = useState<string | null>(null);
+  const myEmail = (me?.email || "").toLowerCase() || null;
 
   // toast notifications
   const [toast, setToast] = useState<{ message: string; type: "success" | "error" } | null>(null);
@@ -76,18 +76,15 @@ export default function GroupsSection({
     return g.name;
   };
 
-  /* ---------- Load me & groups ---------- */
+  /* ---------- Load groups ---------- */
   useEffect(() => {
     let alive = true;
     setLoading(true);
     setError(null);
 
-    Promise.all([http.get("/api/auth/me"), listMyGroups()])
-      .then(async ([meRes, groupsList]) => {
+    listMyGroups()
+      .then(async (groupsList) => {
         if (!alive) return;
-
-        const me = meRes?.data;
-        setMyEmail((me?.email || "").toLowerCase());
 
         setGroups(groupsList);
 

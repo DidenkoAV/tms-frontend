@@ -1,4 +1,4 @@
-import type { ReactNode } from "react";
+import { memo, type ReactNode } from "react";
 import { MarkdownBlock } from "@/shared/ui/markdown/TinyMarkdown";
 
 interface Props {
@@ -12,7 +12,7 @@ interface Props {
   className?: string;
 }
 
-export default function CasePreconditionsBlock({
+function CasePreconditionsBlock({
   value,
   preview = false,
   onChange,
@@ -85,3 +85,5 @@ export default function CasePreconditionsBlock({
     </section>
   );
 }
+
+export default memo(CasePreconditionsBlock);

@@ -61,8 +61,7 @@ export default function RunComments({
     }
   }
 
-  useEffect(() => { reload(); }, [runId, caseId]);
-  useEffect(() => { reload(); }, [refreshTick]);
+  useEffect(() => { reload(); }, [runId, caseId, refreshTick]);
 
   async function submit() {
     const comment = text.trim();

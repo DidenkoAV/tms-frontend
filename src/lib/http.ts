@@ -14,8 +14,9 @@ function resolveApiBase() {
     return "http://localhost:8083";
   }
 
-  // 3) Prod / any other environment - hit same domain, nginx proxies /api → backend
-  return "/api";
+  // 3) Prod / any other environment - use same origin.
+  // API calls already include "/api/..." prefix in request paths.
+  return "";
 }
 
 const API_BASE_URL = resolveApiBase();
@@ -24,6 +25,13 @@ export const http = axios.create({
   baseURL: API_BASE_URL,
   withCredentials: true, // important for HttpOnly cookie
 });
+
+type RetryableConfig = {
+  _csrfRetried?: boolean;
+  method?: string;
+  url?: string;
+  headers?: Record<string, string>;
+};
 
 function applyAuthHeader(token: string | null) {
   if (token) {
@@ -39,30 +47,34 @@ export function setAuthToken(token: string | null) {
   applyAuthHeader(token);
 }
 
+export async function ensureCsrfToken(): Promise<void> {
+  // Public endpoint that forces CSRF token initialization on backend.
+  await http.get("/api/auth/csrf", { withCredentials: true });
+}
+
 // On page load, pull token from localStorage (for classic login)
 applyAuthHeader(localStorage.getItem("token"));
 
 // Store CSRF token in memory
 let csrfToken: string | null = null;
 
-// Helper function to get CSRF token from cookie
-function getCsrfToken(): string | null {
-  // First, try to get from memory
-  if (csrfToken) {
-    return csrfToken;
-  }
-
-  // Then try to read from cookie
+function readCsrfTokenFromCookie(): string | null {
   const value = `; ${document.cookie}`;
   const parts = value.split(`; XSRF-TOKEN=`);
-  if (parts.length === 2) {
-    const token = decodeURIComponent(parts.pop()?.split(';').shift() || '');
-    if (token) {
-      csrfToken = token; // Cache it
-      return token;
-    }
+  if (parts.length !== 2) return null;
+  const token = decodeURIComponent(parts.pop()?.split(";").shift() || "");
+  return token || null;
+}
+
+// Helper function to get CSRF token.
+// Always prefer the latest cookie value to avoid stale in-memory token.
+function getCsrfToken(): string | null {
+  const cookieToken = readCsrfTokenFromCookie();
+  if (cookieToken) {
+    csrfToken = cookieToken;
+    return cookieToken;
   }
-  return null;
+  return csrfToken;
 }
 
 // Helper function to extract CSRF token from Set-Cookie header
@@ -76,17 +88,10 @@ function extractCsrfFromSetCookie(setCookieHeader: string | undefined): string |
 http.interceptors.request.use(
   (config) => {
     // Add CSRF token to all requests (GET, POST, PUT, PATCH, DELETE)
-    const csrfToken = getCsrfToken();
+    const token = getCsrfToken();
 
-    // Debug logging
-    if (import.meta.env.DEV) {
-      console.log('[HTTP] Request:', config.method?.toUpperCase(), config.url);
-      console.log('[HTTP] CSRF Token from cookie:', csrfToken);
-      console.log('[HTTP] All cookies:', document.cookie);
-    }
-
-    if (csrfToken) {
-      config.headers['X-XSRF-TOKEN'] = csrfToken;
+    if (token) {
+      config.headers['X-XSRF-TOKEN'] = token;
     }
     return config;
   },
@@ -102,9 +107,6 @@ http.interceptors.response.use(
     const headerToken = response.headers['x-xsrf-token'];
     if (headerToken) {
       csrfToken = headerToken;
-      if (import.meta.env.DEV) {
-        console.log('[HTTP] CSRF token from response header:', headerToken);
-      }
       return response;
     }
 
@@ -114,9 +116,6 @@ http.interceptors.response.use(
       const token = extractCsrfFromSetCookie(Array.isArray(setCookie) ? setCookie[0] : setCookie);
       if (token) {
         csrfToken = token;
-        if (import.meta.env.DEV) {
-          console.log('[HTTP] CSRF token extracted from Set-Cookie:', token);
-        }
       }
     }
 
@@ -125,9 +124,6 @@ http.interceptors.response.use(
       const cookieToken = getCsrfToken();
       if (cookieToken && cookieToken !== csrfToken) {
         csrfToken = cookieToken;
-        if (import.meta.env.DEV) {
-          console.log('[HTTP] CSRF token updated from cookie:', cookieToken);
-        }
       }
     }, 0);
 
@@ -138,18 +134,34 @@ http.interceptors.response.use(
     if (error.response?.headers?.['x-xsrf-token']) {
       const headerToken = error.response.headers['x-xsrf-token'];
       csrfToken = headerToken;
-      if (import.meta.env.DEV) {
-        console.log('[HTTP] CSRF token from error response header:', headerToken);
-      }
     } else if (error.response?.headers?.['set-cookie']) {
       const setCookie = error.response.headers['set-cookie'];
       const token = extractCsrfFromSetCookie(Array.isArray(setCookie) ? setCookie[0] : setCookie);
       if (token) {
         csrfToken = token;
-        if (import.meta.env.DEV) {
-          console.log('[HTTP] CSRF token from error Set-Cookie:', token);
-        }
       }
+    }
+
+    // Auto-heal CSRF mismatch for mutating requests:
+    // refresh CSRF cookie and retry once.
+    const config = (error.config || {}) as RetryableConfig;
+    const method = (config.method || "").toLowerCase();
+    const isMutating = ["post", "put", "patch", "delete"].includes(method);
+    const isCsrfEndpoint = (config.url || "").includes("/api/auth/csrf");
+    if (error.response?.status === 403 && isMutating && !config._csrfRetried && !isCsrfEndpoint) {
+      config._csrfRetried = true;
+      return ensureCsrfToken()
+        .then(() => {
+          const latestToken = getCsrfToken();
+          if (latestToken) {
+            config.headers = {
+              ...(config.headers || {}),
+              "X-XSRF-TOKEN": latestToken,
+            };
+          }
+          return http.request(config as any);
+        })
+        .catch(() => Promise.reject(error));
     }
 
     // If we get 401 Unauthorized, clear the token and redirect to login
@@ -174,7 +186,6 @@ http.interceptors.response.use(
 
     // Handle rate limiting (429 Too Many Requests)
     if (error.response?.status === 429) {
-      console.warn('[HTTP] Rate limit exceeded:', error.response?.data?.message);
       // You can add a toast notification here if you have a notification system
     }
 

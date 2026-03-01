@@ -11,6 +11,7 @@ import type { Run } from "@/entities/test-run";
 import { STATUS_ID } from "@/entities/test-result";
 import { listMilestones } from "@/entities/milestone";
 import type { Milestone } from "@/entities/milestone";
+import { useToast } from "@/shared/ui/alert";
 
 // editor helpers
 import {
@@ -85,6 +86,7 @@ export default function ProjectOverviewPage() {
   const { id } = useParams();
   const nav = useNavigate();
   const projectId = Number(id ?? NaN);
+  const toast = useToast();
 
   const [project, setProject] = useState<Project | null>(null);
   const [suitesCount, setSuitesCount] = useState<number>(0);
@@ -375,14 +377,14 @@ export default function ProjectOverviewPage() {
                   try {
                     const html = rtfRef.current ? rtfRef.current.innerHTML : "";
                     const mdToSend = htmlToMd(html);
-                    const { data } = await http.patch<Project>(`/api/projects/${projectId}`, { description: mdToSend });
-                    setMd(mdToSend);
-                    setProject(data);
-                    setEditingDesc(false);
-                  } catch (e: any) {
-                    alert(e?.response?.data?.message || "Failed to save description");
-                  }
-                }}
+                  const { data } = await http.patch<Project>(`/api/projects/${projectId}`, { description: mdToSend });
+                  setMd(mdToSend);
+                  setProject(data);
+                  setEditingDesc(false);
+                } catch (e: any) {
+                    toast.error(e?.response?.data?.message || "Failed to save description");
+                }
+              }}
               >
                 Save
               </button>
@@ -532,4 +534,3 @@ function MarkdownView({ markdown }: { markdown: string }) {
   const html = markdownToHtml(markdown);
   return <div className="prose max-w-none dark:prose-invert" dangerouslySetInnerHTML={{ __html: html }} />;
 }
-

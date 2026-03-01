@@ -1,3 +1,4 @@
+import { memo } from "react";
 import PillSelect, { type PillOption } from "@/shared/ui/select/DropdownSelect";
 import TagChips from "@/shared/ui/tags/TagChips";
 import { FolderIcon } from "@/shared/ui/icons";
@@ -74,7 +75,7 @@ const DEFAULT_STATUS_OPTIONS: StatusOption[] = [
   { value: "Failed" },
 ];
 
-export default function CaseMeta({
+function CaseMeta({
   priority,
   type,
   automation,
@@ -243,3 +244,5 @@ export default function CaseMeta({
     </section>
   );
 }
+
+export default memo(CaseMeta);

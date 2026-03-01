@@ -45,7 +45,6 @@ export type CaseRowProps = {
   checked: boolean;
   onCheck: (v: boolean) => void;
   projectId: number;
-  dataVersion?: number;
   groupMembers: AssigneeOption[];
 };
 
@@ -65,7 +64,6 @@ export default function CaseRow({
   checked,
   onCheck,
   projectId,
-  dataVersion,
   groupMembers,
 }: CaseRowProps) {
   const priority: CasePriorityLabel = priorityLabelFromId(c.priorityId);

@@ -5,8 +5,6 @@ import type { Me } from "@/entities/group";
 
 import JiraIntegrationForm from "@/features/integrations/jira/ui/JiraIntegrationForm";
 
-import { getJiraConnection } from "@/features/integrations/jira/api";
-
 import { CheckCircle2, XCircle } from "lucide-react";
 
 /* --- logos --- */
@@ -46,32 +44,6 @@ export default function IntegrationsSection({
   const tabs = [
     { key: "jira", label: "Jira", logo: jiraLogo },
   ] as const;
-
-  /* ---------- Jira status ---------- */
-  useEffect(() => {
-    if (!groupId) return;
-
-    let alive = true;
-
-    (async () => {
-      try {
-        const conn = await getJiraConnection(groupId);
-        if (!alive) return;
-        setConnected((prev) => ({ ...prev, jira: !!conn }));
-      } catch {
-        if (!alive) return;
-        setConnected((prev) => ({ ...prev, jira: false }));
-      }
-    })();
-
-    return () => {
-      alive = false;
-    };
-  }, [groupId]);
-
-
-
-
 
   /* ---------- callbacks from forms ---------- */
 

@@ -1,27 +1,64 @@
 import { http } from "@/lib/http";
 import type { JiraConnectionDto, Attachment, JiraIssue } from "./types";
 
+const JIRA_CONN_TTL_MS = 30_000;
+const jiraConnectionCache = new Map<number, { data: JiraConnectionDto | null; ts: number }>();
+const jiraConnectionPromise = new Map<number, Promise<JiraConnectionDto | null>>();
+
+function isFresh(ts: number, ttlMs: number) {
+  return Date.now() - ts < ttlMs;
+}
+
+export function invalidateJiraConnectionCache(groupId?: number) {
+  if (typeof groupId === "number") {
+    jiraConnectionCache.delete(groupId);
+    jiraConnectionPromise.delete(groupId);
+    return;
+  }
+  jiraConnectionCache.clear();
+  jiraConnectionPromise.clear();
+}
+
 /* ---------- Jira Connection ---------- */
-export async function getJiraConnection(groupId: number): Promise<JiraConnectionDto | null> {
+export async function getJiraConnection(groupId: number, force = false): Promise<JiraConnectionDto | null> {
+  const cached = jiraConnectionCache.get(groupId);
+  if (!force && cached && isFresh(cached.ts, JIRA_CONN_TTL_MS)) {
+    return cached.data;
+  }
+  if (!force && jiraConnectionPromise.has(groupId)) {
+    return jiraConnectionPromise.get(groupId)!;
+  }
+
+  const p = (async () => {
   try {
     const { data } = await http.get(`/api/integrations/jira/connection/${groupId}`);
 
     // If backend returned null (no connection) - return null
     if (!data) {
+      jiraConnectionCache.set(groupId, { data: null, ts: Date.now() });
       return null;
     }
 
-    return {
+    const normalized = {
       baseUrl: data.baseUrl,
       email: data.email,
       defaultProject: data.defaultProject,
       defaultIssueType: data.defaultIssueType,
       hasToken: !!data.hasToken,
     };
+    jiraConnectionCache.set(groupId, { data: normalized, ts: Date.now() });
+    return normalized;
   } catch {
     // Any error - assume no integration
+    jiraConnectionCache.set(groupId, { data: null, ts: Date.now() });
     return null;
   }
+  })().finally(() => {
+    jiraConnectionPromise.delete(groupId);
+  });
+
+  jiraConnectionPromise.set(groupId, p);
+  return p;
 }
 
 export async function saveJiraConnection(
@@ -35,17 +72,20 @@ export async function saveJiraConnection(
   }
 ): Promise<JiraConnectionDto> {
   const { data } = await http.post(`/api/integrations/jira/connection/${groupId}`, req);
-  return {
+  const normalized = {
     baseUrl: data.baseUrl,
     email: data.email,
     defaultProject: data.defaultProject,
     defaultIssueType: data.defaultIssueType,
     hasToken: true,
   };
+  jiraConnectionCache.set(groupId, { data: normalized, ts: Date.now() });
+  return normalized;
 }
 
 export async function removeJiraConnection(groupId: number): Promise<void> {
   await http.delete(`/api/integrations/jira/connection/${groupId}`);
+  jiraConnectionCache.set(groupId, { data: null, ts: Date.now() });
 }
 
 export async function testJiraConnection(groupId: number): Promise<string> {

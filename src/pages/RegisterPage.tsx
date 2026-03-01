@@ -1,6 +1,6 @@
 ﻿// src/pages/RegisterPage.tsx
 import { useState } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { Link } from "react-router-dom";
 import { http } from "@/lib/http";
 
 import messagepointLogo from "@/public/logos/logo.svg";
@@ -30,7 +30,6 @@ function strengthScore(pw: string) {
 }
 
 export default function RegisterPage() {
-  const nav = useNavigate();
   const [fullName, setFullName] = useState("");
   const [email, setEmail]       = useState("");
   const [password, setPassword] = useState("");
@@ -69,17 +68,6 @@ export default function RegisterPage() {
 
   return (
     <div className="relative min-h-screen register-scope bg-gradient-to-br from-slate-50 via-white to-orange-50/30">
-      <style>{`
-        .register-scope input:-webkit-autofill,
-        .register-scope input:-webkit-autofill:hover,
-        .register-scope input:-webkit-autofill:focus,
-        .register-scope input:-webkit-autofill:active {
-          -webkit-box-shadow: 0 0 0 30px white inset !important;
-          -webkit-text-fill-color: #0f172a !important;
-          transition: background-color 5000s ease-in-out 0s;
-        }
-      `}</style>
-
       <div className="grid px-4 py-10 place-items-center">
         <div className="w-full max-w-md p-8 bg-white border shadow-lg rounded-2xl border-slate-200">
           <div className="grid gap-3 mb-6 place-items-center">
@@ -191,10 +179,7 @@ export default function RegisterPage() {
 
             <button
               disabled={!canSubmit}
-              className="w-full px-6 py-3 font-semibold text-white rounded-lg disabled:opacity-50 disabled:cursor-not-allowed"
-              style={{ backgroundColor: "#7c1a87" }}
-              onMouseEnter={(e) => !loading && canSubmit && (e.currentTarget.style.backgroundColor = "#6a1675")}
-              onMouseLeave={(e) => !loading && canSubmit && (e.currentTarget.style.backgroundColor = "#7c1a87")}
+              className="w-full px-6 py-3 font-semibold text-white rounded-lg bg-[#7c1a87] hover:bg-[#6a1675] disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-[#7c1a87] transition-colors"
             >
               {loading ? "Creating account…" : "Create account"}
             </button>

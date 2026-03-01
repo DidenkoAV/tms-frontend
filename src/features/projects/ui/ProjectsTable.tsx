@@ -7,15 +7,7 @@ import { EditIcon, TrashIcon, OpenIcon, StarIcon } from "@/shared/ui/icons";
 import Pagination from "@/shared/ui/pagination/Pagination";
 import RowHighlight from "@/shared/ui/table/RowHighlight";
 import TableRowActions from "@/shared/ui/table/TableRowActions";
-
-type Project = {
-  id: number;
-  name: string;
-  code: string;
-  groupId: number;
-  groupName?: string;
-  groupPersonal?: boolean;
-};
+import type { Project } from "@/entities/project/api/projectApi";
 
 type ProjectStat = { suites: number; cases: number; runs: number; milestones: number };
 type Stats = Record<number, ProjectStat>;

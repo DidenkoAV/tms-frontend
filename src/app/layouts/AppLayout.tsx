@@ -3,9 +3,11 @@ import { NavLink, Outlet, useNavigate, useLocation } from "react-router-dom";
 import { useEffect, useRef, useState, useCallback, useMemo } from "react";
 import { http, setAuthToken } from "@/lib/http";
 import { getTheme, setTheme as setAppTheme } from "@/lib/theme";
+import { ToastProvider } from "@/shared/ui/alert";
 
 // Layout components
 import { Logo, ThemeToggle, ProjectsLink, UserMenu, AdminLink } from "@/shared/ui/layout/Header";
+import type { Me } from "@/entities/group";
 
 import type { AppOutletCtx } from "@/app/types";
 import { isPublicRoute } from "@/app/config/constants";
@@ -18,7 +20,7 @@ export default function App() {
   const showHeader = useMemo(() => !isPublicRoute(pathname), [pathname]);
 
   type AuthStatus = "loading" | "guest" | "user";
-  const [me, setMe] = useState<{ fullName?: string | null; email?: string | null; roles?: string[] } | null>(null);
+  const [me, setMe] = useState<Me | null>(null);
   const [status, setStatus] = useState<AuthStatus>("loading");
 
   const bootOnce = useRef(false);
@@ -50,7 +52,7 @@ export default function App() {
   const loadMe = useCallback(async () => {
     try {
       const r = await http.get("/api/auth/me");
-      setMe({ fullName: r.data.fullName, email: r.data.email, roles: r.data.roles });
+      setMe(r.data);
       setStatus("user");
     } catch (err) {
       // Silent fail - user is not authenticated
@@ -133,44 +135,46 @@ export default function App() {
   const goProfile = useCallback(() => nav("/account"), [nav]);
 
   return (
-    <div className="min-h-screen bg-white text-slate-900 dark:bg-[#0b0f1a] dark:text-slate-100">
-      {showHeader && (
-        <header className="relative z-50 isolate border-b bg-white/90 backdrop-blur dark:border-slate-800 dark:bg-[#0b0f1a]/95">
-          <div className="flex items-center max-w-6xl gap-4 px-4 py-3 mx-auto">
-            <NavLink
-              to={authed ? "/dashboard" : "/"}
-              className="flex items-center gap-2"
-              aria-label="Home"
-            >
-              <Logo size={28} withWordmark />
-            </NavLink>
+    <ToastProvider>
+      <div className="min-h-screen bg-white text-slate-900 dark:bg-[#0b0f1a] dark:text-slate-100">
+        {showHeader && (
+          <header className="relative z-50 isolate border-b bg-white/90 backdrop-blur dark:border-slate-800 dark:bg-[#0b0f1a]/95">
+            <div className="flex items-center max-w-6xl gap-4 px-4 py-3 mx-auto">
+              <NavLink
+                to={authed ? "/dashboard" : "/"}
+                className="flex items-center gap-2"
+                aria-label="Home"
+              >
+                <Logo size={28} withWordmark />
+              </NavLink>
 
-            <nav className="flex items-center gap-3 ml-auto">
-              {authed && <ProjectsLink />}
-              {authed && me?.roles?.includes("ROLE_ADMIN") && <AdminLink />}
-              {authed && (
-                <UserMenu
-                  fullName={me?.fullName}
-                  email={me?.email}
-                  onProfile={goProfile}
-                  onLogout={onLogout}
-                />
-              )}
-              {authed && <ThemeToggle />}
-            </nav>
-          </div>
-        </header>
-      )}
-
-      <main>
-        {status === "loading" && !isPublicRoute(pathname) ? (
-          <div className="grid min-h-[40vh] place-items-center text-slate-500">
-            Checking session…
-          </div>
-        ) : (
-          <Outlet context={{ authed, me, onLogout } satisfies AppOutletCtx} />
+              <nav className="flex items-center gap-3 ml-auto">
+                {authed && <ProjectsLink />}
+                {authed && me?.roles?.includes("ROLE_ADMIN") && <AdminLink />}
+                {authed && (
+                  <UserMenu
+                    fullName={me?.fullName}
+                    email={me?.email}
+                    onProfile={goProfile}
+                    onLogout={onLogout}
+                  />
+                )}
+                {authed && <ThemeToggle />}
+              </nav>
+            </div>
+          </header>
         )}
-      </main>
-    </div>
+
+        <main>
+          {status === "loading" && !isPublicRoute(pathname) ? (
+            <div className="grid min-h-[40vh] place-items-center text-slate-500">
+              Checking session…
+            </div>
+          ) : (
+            <Outlet context={{ authed, me, onLogout } satisfies AppOutletCtx} />
+          )}
+        </main>
+      </div>
+    </ToastProvider>
   );
 }

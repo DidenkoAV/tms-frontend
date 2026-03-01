@@ -147,6 +147,13 @@ export type ImportTestCasesResponse = {
   updated: number;
 };
 
+export type TestCasePageResponse = {
+  items: TestCase[];
+  page: number;
+  size: number;
+  total: number;
+};
+
 /* ======================================================
  * ===============   UI LABEL MAPPINGS   =================
  * ====================================================== */

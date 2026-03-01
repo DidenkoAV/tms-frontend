@@ -1,8 +1,8 @@
 // Types for App layout and routing context
+import type { Me } from "@/entities/group";
 
 export type AppOutletCtx = {
   authed: boolean;
-  me: { fullName?: string | null; email?: string | null; roles?: string[] } | null;
+  me: Me | null;
   onLogout: () => void;
 };
-

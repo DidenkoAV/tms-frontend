@@ -4,13 +4,11 @@ import { useNavigate, useParams } from "react-router-dom";
 // Entities (new structure)
 import {
   listMilestones,
-  listMilestoneRuns,
+  listMilestoneStatusCounts,
   updateMilestone,
   archiveMilestone,
 } from "@/entities/milestone";
 import type { Milestone } from "@/entities/milestone";
-import { listRunCases } from "@/entities/test-run";
-import type { RunCase } from "@/entities/test-run";
 import { STATUS_ID } from "@/entities/test-result";
 import { useConfirm, AlertBanner } from "@/shared/ui/alert";
 
@@ -73,6 +71,8 @@ export default function MilestonesPage() {
     success: true,
     author: true,
   });
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(12);
 
   // inline edit
   const [editingId, setEditingId] = useState<number | null>(null);
@@ -153,46 +153,59 @@ export default function MilestonesPage() {
   }, [projectId]);
 
   /* -------- load stats -------- */
+  const milestoneIds = useMemo(
+    () => items.map((m) => m.id).sort((a, b) => a - b),
+    [items]
+  );
+  const milestoneIdsKey = useMemo(
+    () => milestoneIds.join(","),
+    [milestoneIds]
+  );
+
   useEffect(() => {
     let cancelled = false;
     (async () => {
-      if (!items.length) {
+      if (!milestoneIds.length) {
         setStats({});
         return;
       }
 
-      const entries: Array<[number, MsStats]> = [];
-      for (const m of items) {
-        try {
-          const runs = await listMilestoneRuns(m.id);
-          const counts: Record<StatusKey, number> = { ...emptyCounts };
-          let total = 0;
-          for (const r of runs as any[]) {
-            const rc = await listRunCases(r.id);
-            for (const row of rc as RunCase[]) {
-              if (row.currentStatusId != null) {
-                counts[ID_TO_KEY(row.currentStatusId)]++;
-              }
-            }
-            total += (rc as RunCase[]).length;
-          }
-          entries.push([
-            m.id,
-            { counts, total, passRate: total ? counts.PASSED / total : 0 },
-          ]);
-        } catch {
-          entries.push([
-            m.id,
-            { counts: { ...emptyCounts }, total: 0, passRate: 0 },
-          ]);
+      try {
+        const rows = await listMilestoneStatusCounts(projectId);
+        const entries: Array<[number, MsStats]> = milestoneIds.map((id) => [
+          id,
+          { counts: { ...emptyCounts }, total: 0, passRate: 0 },
+        ]);
+        const byMilestone = new Map(entries);
+
+        for (const row of rows) {
+          const current = byMilestone.get(row.milestoneId);
+          if (!current) continue;
+          const key = ID_TO_KEY(row.statusId);
+          current.counts[key] += row.count;
+          current.total += row.count;
+        }
+        for (const value of byMilestone.values()) {
+          value.passRate = value.total ? value.counts.PASSED / value.total : 0;
+        }
+        if (!cancelled) setStats(Object.fromEntries(byMilestone));
+      } catch {
+        if (!cancelled) {
+          setStats(
+            Object.fromEntries(
+              milestoneIds.map((id) => [
+                id,
+                { counts: { ...emptyCounts }, total: 0, passRate: 0 },
+              ])
+            )
+          );
         }
       }
-      if (!cancelled) setStats(Object.fromEntries(entries));
     })();
     return () => {
       cancelled = true;
     };
-  }, [items]);
+  }, [milestoneIdsKey, projectId]);
 
   /* -------- filter + sort -------- */
   const filtered = useMemo(() => {
@@ -219,6 +232,22 @@ export default function MilestonesPage() {
       return 0;
     });
   }, [filtered, sortBy, sortDir, stats, favorites]);
+
+  const totalItems = sorted.length;
+  const effectivePageSize = pageSize > 0 ? pageSize : Math.max(totalItems, 1);
+  const totalPages = Math.max(1, Math.ceil(totalItems / effectivePageSize));
+  const safePage = Math.min(page, totalPages);
+  const pagedItems = useMemo(() => {
+    if (pageSize === 0) return sorted;
+    const start = (safePage - 1) * effectivePageSize;
+    return sorted.slice(start, start + effectivePageSize);
+  }, [sorted, pageSize, safePage, effectivePageSize]);
+
+  useEffect(() => {
+    if (page !== safePage) {
+      setPage(safePage);
+    }
+  }, [page, safePage]);
 
   const tableStats = useMemo(
     () =>
@@ -269,7 +298,7 @@ export default function MilestonesPage() {
       />
 
       <MilestoneTable
-        pagedItems={sorted}
+        pagedItems={pagedItems}
         stats={tableStats}
         favorites={favorites}
         selectedIds={selectedIds}
@@ -316,13 +345,13 @@ export default function MilestonesPage() {
           })
         }
         onUpdateDates={updateDates}
-        page={1}
-        pageSize={20}
-        totalPages={1}
-        totalItems={items.length}
-        setPage={() => {}}
-        setPageSize={() => {}}
-        needPad={items.length < 10}
+        page={safePage}
+        pageSize={pageSize}
+        totalPages={totalPages}
+        totalItems={totalItems}
+        setPage={setPage}
+        setPageSize={setPageSize}
+        needPad={pagedItems.length < 10}
         colCount={6}
       />
 

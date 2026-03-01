@@ -1,4 +1,5 @@
-import { StepsEditor, type StepForm } from "@/features/test-cases";
+import { memo } from "react";
+import StepsEditor, { type StepForm } from "./StepsEditor";
 
 type Props = {
   steps: StepForm[];
@@ -8,7 +9,7 @@ type Props = {
 
 export type { StepForm };
 
-export default function CaseStepsBlock({ steps, onChange, className }: Props) {
+function CaseStepsBlock({ steps, onChange, className }: Props) {
   return (
     <div
       className={
@@ -25,3 +26,5 @@ export default function CaseStepsBlock({ steps, onChange, className }: Props) {
     </div>
   );
 }
+
+export default memo(CaseStepsBlock);

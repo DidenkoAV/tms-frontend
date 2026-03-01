@@ -9,6 +9,7 @@ type Props = {
   onAddCases: (ids: number[]) => void;
   suites: { id: number; name: string }[];
   allCases: TestCase[];
+  loading?: boolean;
   alreadyInRun: Set<number>;
 };
 
@@ -19,6 +20,7 @@ export default function AddToRunModal({
   onAddCases,
   suites,
   allCases,
+  loading = false,
   alreadyInRun,
 }: Props) {
   const [mode, setMode] = useState<Mode>("cases");
@@ -120,7 +122,11 @@ export default function AddToRunModal({
       {mode === "cases" ? (
         <>
           <div className="overflow-auto border max-h-80 rounded-2xl border-slate-300 dark:border-slate-800">
-            {eligibleCases.length === 0 ? (
+            {loading ? (
+              <div className="p-3 text-sm text-slate-500 dark:text-slate-400">
+                Loading cases...
+              </div>
+            ) : eligibleCases.length === 0 ? (
               <div className="p-3 text-sm text-slate-500 dark:text-slate-400">
                 Nothing to add.
               </div>

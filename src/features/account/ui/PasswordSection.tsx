@@ -3,6 +3,7 @@ import { useMemo, useState } from "react";
 import { changePassword } from "@/entities/group";
 import { pwScore, validateNewPw } from "./utils";
 import { CheckCircle2Icon, XCircleIcon, Shield, AlertCircle } from "lucide-react";
+import { useToast } from "@/shared/ui/alert";
 
 type Props = {
   email?: string | null;
@@ -21,6 +22,7 @@ export default function PasswordSection({
   ButtonPrimary,
   CardHeader,
 }: Props) {
+  const toast = useToast();
   const [curPw, setCurPw] = useState("");
   const [newPw, setNewPw] = useState("");
   const [newPw2, setNewPw2] = useState("");
@@ -36,8 +38,14 @@ export default function PasswordSection({
 
   async function onSubmit(e: React.FormEvent) {
     e.preventDefault();
-    if (!newPw || newPw !== newPw2) return alert("Passwords do not match");
-    if (pwErrors.length) return alert("Please satisfy password requirements");
+    if (!newPw || newPw !== newPw2) {
+      toast.warning("Passwords do not match");
+      return;
+    }
+    if (pwErrors.length) {
+      toast.warning("Please satisfy password requirements");
+      return;
+    }
 
     setSaving(true);
     try {
@@ -45,14 +53,14 @@ export default function PasswordSection({
       setCurPw("");
       setNewPw("");
       setNewPw2("");
-      alert("Password successfully changed.");
+      toast.success("Password successfully changed.");
     } catch (e: any) {
       const msg =
         e?.response?.data?.message ||
         (e?.response?.status === 429
           ? "Password change limit reached. Try again later."
           : "Failed to change password");
-      alert(msg);
+      toast.error(msg);
     } finally {
       setSaving(false);
     }

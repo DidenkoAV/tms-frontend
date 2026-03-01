@@ -1,5 +1,5 @@
 // src/features/cases/components/StepsEditor.tsx
-import { useEffect, useState, type DragEvent } from "react";
+import { memo, useEffect, useRef, useState, type DragEvent } from "react";
 import { TFCheckbox } from "@/shared/ui/table/CustomCheckbox";
 import { InfoIcon } from "lucide-react";
 
@@ -38,7 +38,7 @@ const joinActions = (arr: StepForm[]) =>
   arr.map((s) => (s.action || "").trim()).filter(Boolean).join("\n");
 
 /* ------------ Step Item ------------ */
-function StepItem({
+const StepItem = memo(function StepItem({
   index,
   value,
   expectedOn,
@@ -107,7 +107,7 @@ function StepItem({
       </div>
     </div>
   );
-}
+});
 
 /* ------------ StepsEditor ------------ */
 const MODE_KEY = "steps.editor.mode.v1";
@@ -118,7 +118,8 @@ export default function StepsEditor({
   onChange,
   expectedEnabledDefault = true,
 }: Props) {
-  const stepCount = steps.length;
+  const [localSteps, setLocalSteps] = useState<StepForm[]>(steps);
+  const stepCount = localSteps.length;
   const [mode, setMode] = useState<Mode>(
     () => (localStorage.getItem(MODE_KEY) as Mode) || "structured"
   );
@@ -126,25 +127,63 @@ export default function StepsEditor({
 
   const [expectedOn, setExpectedOn] = useState(expectedEnabledDefault);
   const [dragIndex, setDragIndex] = useState<number | null>(null);
-  const [simpleRaw, setSimpleRaw] = useState(() => joinActions(steps));
+  const [simpleRaw, setSimpleRaw] = useState(() => joinActions(localSteps));
+  const debounceRef = useRef<number | null>(null);
 
-  const addEmpty = () => onChange([...steps, { action: "", expected: "" }]);
-  const clearAll = () => onChange([]);
+  useEffect(() => {
+    setLocalSteps(steps);
+  }, [steps]);
+
+  useEffect(() => {
+    if (mode !== "simple") return;
+    setSimpleRaw(joinActions(localSteps));
+  }, [mode, localSteps]);
+
+  useEffect(() => {
+    return () => {
+      if (debounceRef.current) {
+        window.clearTimeout(debounceRef.current);
+      }
+    };
+  }, []);
+
+  const commit = (next: StepForm[], immediate = false) => {
+    setLocalSteps(next);
+    if (immediate) {
+      if (debounceRef.current) {
+        window.clearTimeout(debounceRef.current);
+        debounceRef.current = null;
+      }
+      onChange(next);
+      return;
+    }
+
+    if (debounceRef.current) {
+      window.clearTimeout(debounceRef.current);
+    }
+    debounceRef.current = window.setTimeout(() => {
+      onChange(next);
+      debounceRef.current = null;
+    }, 180);
+  };
+
+  const addEmpty = () => commit([...localSteps, { action: "", expected: "" }], true);
+  const clearAll = () => commit([], true);
 
   const bulkAdd = (raw: string) => {
     const chunks = splitSteps(raw);
     const parsed = chunks
       .map(parseLine)
       .map((s) => (expectedOn ? s : { ...s, expected: "" }));
-    onChange([...steps, ...parsed]);
+    commit([...localSteps, ...parsed], true);
   };
 
   const switchMode = (m: Mode) => {
     if (m === mode) return;
     setMode(m);
     if (m === "simple") {
-      const onlyActions = steps.map((s) => ({ action: s.action, expected: "" }));
-      onChange(onlyActions);
+      const onlyActions = localSteps.map((s) => ({ action: s.action, expected: "" }));
+      commit(onlyActions, true);
       setSimpleRaw(joinActions(onlyActions));
     }
   };
@@ -204,7 +243,7 @@ export default function StepsEditor({
               onChange={(checked) => {
                 setExpectedOn(checked);
                 if (!checked)
-                  onChange(steps.map((s) => ({ ...s, expected: "" })));
+                  commit(localSteps.map((s) => ({ ...s, expected: "" })), true);
               }}
             />
             <span>Expected</span>
@@ -218,12 +257,12 @@ export default function StepsEditor({
             <button
               type="button"
               onClick={clearAll}
-              disabled={!steps.length}
+              disabled={!localSteps.length}
               className="px-3 py-1.5 rounded-md text-sm text-slate-500 hover:bg-slate-100 disabled:opacity-40 dark:text-slate-400 dark:hover:bg-slate-800"
             >
-              Clear
-            </button>
-          </div>
+            Clear
+          </button>
+        </div>
         )}
       </div>
 
@@ -235,7 +274,7 @@ export default function StepsEditor({
             const v = e.target.value;
             setSimpleRaw(v);
             const chunks = splitSteps(v);
-            onChange(chunks.map((a) => ({ action: a, expected: "" })));
+            commit(chunks.map((a) => ({ action: a, expected: "" })));
           }}
           placeholder={`Open /login\nType email\nClick "Login"`}
           className="w-full min-h-[160px] rounded-md border border-slate-200 bg-transparent px-3 py-2 text-sm text-slate-800 outline-none resize-y focus:border-sky-400 focus:ring-1 focus:ring-sky-100 dark:border-slate-700 dark:text-slate-200 dark:focus:border-cyan-400 dark:focus:ring-1 dark:focus:ring-cyan-900/40"
@@ -259,26 +298,26 @@ export default function StepsEditor({
             />
 
             <div className="mt-2 divide-y divide-slate-200 dark:divide-slate-800">
-              {steps.length === 0 ? (
+              {localSteps.length === 0 ? (
                 <div className="py-3 text-sm italic text-slate-500 dark:text-slate-400">
                   No steps yet. Use <b>+ Step</b> or enter text above.
                 </div>
               ) : (
-                steps.map((st, i) => (
+                localSteps.map((st, i) => (
                   <StepItem
                     key={i}
                     index={i}
                     value={st}
                     expectedOn={expectedOn}
                     onChange={(next) => {
-                      const arr = [...steps];
+                      const arr = [...localSteps];
                       arr[i] = expectedOn ? next : { ...next, expected: "" };
-                      onChange(arr);
+                      commit(arr);
                     }}
                     onDelete={() => {
-                      const arr = [...steps];
+                      const arr = [...localSteps];
                       arr.splice(i, 1);
-                      onChange(arr);
+                      commit(arr, true);
                     }}
                     onDragStart={() => setDragIndex(i)}
                     onDragOver={(e) => {
@@ -292,10 +331,10 @@ export default function StepsEditor({
                       e.preventDefault();
                       e.currentTarget.classList.remove("ring-1", "ring-cyan-400/40");
                       if (dragIndex === null) return;
-                      const arr = [...steps];
+                      const arr = [...localSteps];
                       const [it] = arr.splice(dragIndex, 1);
                       arr.splice(i, 0, it);
-                      onChange(arr);
+                      commit(arr, true);
                       setDragIndex(null);
                     }}
                   />

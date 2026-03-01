@@ -1,5 +1,13 @@
 ﻿import { http } from "@/lib/http";
 
+const PROJECTS_TTL_MS = 30_000;
+let allProjectsCache: { data: ProjectListItem[]; ts: number } | null = null;
+let allProjectsPromise: Promise<ProjectListItem[]> | null = null;
+
+function isFresh(ts: number) {
+  return Date.now() - ts < PROJECTS_TTL_MS;
+}
+
 /* ========= types ========= */
 export type Project = {
   id: number;
@@ -30,12 +38,31 @@ export type ProjectUpdateRequest = {
   description?: string | null;
 };
 
+export function invalidateProjectsCache() {
+  allProjectsCache = null;
+  allProjectsPromise = null;
+}
+
 /* ========= API ========= */
 
 // All projects across all my groups
 export async function listAllProjects(): Promise<ProjectListItem[]> {
-  const { data } = await http.get<ProjectListItem[]>("/api/projects/all");
-  return data;
+  if (allProjectsCache && isFresh(allProjectsCache.ts)) {
+    return allProjectsCache.data;
+  }
+  if (allProjectsPromise) {
+    return allProjectsPromise;
+  }
+  allProjectsPromise = http
+    .get<ProjectListItem[]>("/api/projects/all")
+    .then(({ data }) => {
+      allProjectsCache = { data, ts: Date.now() };
+      return data;
+    })
+    .finally(() => {
+      allProjectsPromise = null;
+    });
+  return allProjectsPromise;
 }
 
 // Projects within specific group
@@ -47,18 +74,21 @@ export async function listProjectsInGroup(groupId: number): Promise<ProjectListI
 // Create project in group
 export async function createProject(groupId: number, payload: ProjectCreateRequest): Promise<Project> {
   const { data } = await http.post<Project>(`/api/groups/${groupId}/projects`, payload);
+  invalidateProjectsCache();
   return data;
 }
 
 // Update project in group
 export async function updateProject(groupId: number, id: number, payload: ProjectUpdateRequest): Promise<Project> {
   const { data } = await http.patch<Project>(`/api/groups/${groupId}/projects/${id}`, payload);
+  invalidateProjectsCache();
   return data;
 }
 
 // Archive (delete) in group
 export async function deleteProject(groupId: number, id: number): Promise<void> {
   await http.delete(`/api/groups/${groupId}/projects/${id}`);
+  invalidateProjectsCache();
 }
 
 // Project details (if needed)
@@ -73,5 +103,6 @@ export async function bulkArchiveProjectsByGroup(
   ids: number[]
 ): Promise<{ archivedIds: number[]; alreadyArchivedIds: number[]; notFoundIds: number[] }> {
   const { data } = await http.post(`/api/groups/${groupId}/projects/bulk-archive`, { ids });
+  invalidateProjectsCache();
   return data;
 }

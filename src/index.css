@@ -50,3 +50,13 @@ html, body, #root { height: 100%; }
 @media (prefers-reduced-motion: reduce) {
   .forge-cw, .forge-ccw, .svg-spark, .forge-pulse, .forge-fade-in, [style*="shimmer"] { animation: none !important; }
 }
+
+/* Register page autofill normalization */
+.register-scope input:-webkit-autofill,
+.register-scope input:-webkit-autofill:hover,
+.register-scope input:-webkit-autofill:focus,
+.register-scope input:-webkit-autofill:active {
+  -webkit-box-shadow: 0 0 0 30px white inset !important;
+  -webkit-text-fill-color: #0f172a !important;
+  transition: background-color 5000s ease-in-out 0s;
+}
