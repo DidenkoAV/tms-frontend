@@ -103,13 +103,12 @@ function resolveApiBaseForOAuth() {
     return envBase.replace(/\/+$/, "");
   }
 
-  const host = window.location.hostname;
-
-  // 2) Local development - call backend directly
-  if (host === "localhost" || host === "127.0.0.1") {
+  // 2) Vite dev server - call backend directly
+  if (window.location.port === "5173") {
     return "http://localhost:8083";
   }
 
+  // 3) Docker/nginx/prod - use same origin
   return "";
 }
 

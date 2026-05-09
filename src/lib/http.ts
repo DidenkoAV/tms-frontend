@@ -8,13 +8,12 @@ function resolveApiBase() {
     return envBase.replace(/\/+$/, ""); // remove trailing /
   }
 
-  // 2) Local development - Vite on 5173, backend on 8083
-  const host = window.location.hostname;
-  if (host === "localhost" || host === "127.0.0.1") {
+  // 2) Vite dev server - backend runs separately on 8083
+  if (window.location.port === "5173") {
     return "http://localhost:8083";
   }
 
-  // 3) Prod / any other environment - use same origin.
+  // 3) Docker/nginx/prod - use same origin.
   // API calls already include "/api/..." prefix in request paths.
   return "";
 }
