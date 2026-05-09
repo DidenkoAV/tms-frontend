@@ -1,0 +1,27 @@
+image: docker:24
+
+services:
+  - name: docker:24-dind
+    alias: docker
+
+stages:
+  - build
+
+variables:
+  DOCKER_HOST: tcp://docker:2375
+  DOCKER_TLS_CERTDIR: ""
+  AWS_REGION: us-east-2
+  ECR_REGISTRY: 746902955291.dkr.ecr.us-east-2.amazonaws.com
+  ECR_REPOSITORY: testforge-frontend
+
+build-and-push:
+  stage: build
+  script:
+    - docker run --rm -e AWS_ACCESS_KEY_ID="$AWS_ACCESS_KEY_ID" -e AWS_SECRET_ACCESS_KEY="$AWS_SECRET_ACCESS_KEY" -e AWS_DEFAULT_REGION="$AWS_DEFAULT_REGION" amazon/aws-cli ecr get-login-password --region $AWS_REGION > ecr_password.txt
+    - cat ecr_password.txt | docker login --username AWS --password-stdin $ECR_REGISTRY
+    - docker build --platform linux/amd64 -t $ECR_REPOSITORY:latest .
+    - docker tag $ECR_REPOSITORY:latest $ECR_REGISTRY/$ECR_REPOSITORY:latest
+    - docker push $ECR_REGISTRY/$ECR_REPOSITORY:latest
+
+  only:
+    - master
